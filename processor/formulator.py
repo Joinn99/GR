@@ -1,4 +1,4 @@
-
+import os
 import argparse
 import pandas as pd
 import logging
@@ -143,6 +143,8 @@ def save_data(data, domain, phase, output_format):
     """Save the generated data to file."""
     output_file = f"data/messages/amazon_{domain}_{phase}.{output_format}"
     
+    if not os.path.exists(os.path.dirname(output_file)):
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
     if output_format == 'json':
         # Convert to DataFrame and save as JSON
         data.to_json(output_file+"l.gz", orient="records", lines=True, compression="gzip")
