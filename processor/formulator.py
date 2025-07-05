@@ -185,6 +185,8 @@ def main():
     output_data = pd.DataFrame(output_data.explode().tolist(), columns=["messages", "timestamp", "item_id"])
     data_split = time_split_data(output_data)
     for phase, df_phase in data_split.items():
+        if phase == "test":
+            df_phase = df_phase.sort_values(by="timestamp").groupby(level=0).agg("last")        
         save_data(df_phase.sort_values(by="timestamp"), args.domain, phase)
     
     logger.info("Data generation completed successfully!")
