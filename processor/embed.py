@@ -111,28 +111,18 @@ def initialize_model(model_path, gpu_id, gpu_memory_utilization, max_model_len):
     
     return model
 
-
-def get_input(item, tokenizer, max_length=512):
+def get_input(item):
     """Process input item and return formatted text for embedding."""
     instruct = "Compress the following sentence into embedding.\n"
     text = f"{instruct}Title: {item['title']}\nDescription: {item['description']}"
-    
-    if tokenizer:
-        text_ids = tokenizer.encode(text)
-        if len(text_ids) >= max_length:
-            text_ids = text_ids[:max_length - 2]    # 2 is for the special tokens
-        text = tokenizer.decode(text_ids)
-    
     return text
 
 
 def generate_embeddings(model, data, max_length):
     """Generate embeddings for the input data."""
-    tokenizer = model.get_tokenizer()
-    
     # Process all items
     processed_inputs = data.apply(
-        lambda x: get_input(x, tokenizer, max_length), 
+        lambda x: get_input(x), 
         axis=1
     ).tolist()
     

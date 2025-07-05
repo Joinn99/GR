@@ -17,11 +17,10 @@ import pandas as pd
 import argparse
 import logging
 import os
-from pathlib import Path
 from tqdm import tqdm
-import gzip
 from typing import Optional
 
+tqdm.pandas()
 
 class ColoredFormatter(logging.Formatter):
     """Custom formatter that adds colors to log messages."""
@@ -115,25 +114,19 @@ def preprocess_item(item_path: str) -> pd.DataFrame:
     logger = logging.getLogger(__name__)
     log_with_color(logger, "INFO", f"Processing item metadata from: {item_path}", "cyan")
     
-    data = []
-    try:
-        for line in tqdm(gzip.open(item_path, 'r'), desc="Processing items"):
-            json_data = eval(line)
-            item_id = json_data.get('asin', '')
-            description = json_data.get('description', '')
-            title = json_data.get('title', '')
-            
-            if title:  # Only include items with titles
-                data.append({
-                    'item_id': item_id,
-                    'description': description,
-                    'title': title
-                })
-    except Exception as e:
-        logger.error(f"Error processing item file: {e}")
-        raise
-    
-    df = pd.DataFrame(data)
+    df_chunks = pd.read_json(item_path, lines=True, chunksize=1000)
+    df = []
+    for chunk in tqdm(df_chunks, desc="Processing items", unit="k items"):
+        chunk = chunk.loc[:, ['parent_asin', 'description', 'title']]
+        chunk = chunk.rename(columns={'parent_asin': 'item_id'})
+        chunk = chunk[chunk["title"].notna()]
+        chunk = chunk[chunk["title"].apply(len) > 0]
+        chunk["description"] = chunk["description"].apply(lambda x: "\n".join(x) if isinstance(x, list) else str(x))
+        df.append(chunk)
+
+
+    df = pd.concat(df)
+    df = df.reset_index(drop=True)
     log_with_color(logger, "INFO", f"Processed {len(df)} items with valid titles", "green")
     return df
 
@@ -145,7 +138,9 @@ def preprocess_interaction(
     output_item_path: str,
     prefix: str = 'books',
     min_interactions: int = 5,
-    min_date: str = '2012-12-01'
+    min_date: str = '2020-01-01',
+    max_item_description_len: int = 64,
+    tokenizer_path: str = "Qwen/Qwen3-0.6B"
 ) -> None:
     """Preprocess interaction data and filter based on criteria.
     
@@ -166,6 +161,7 @@ def preprocess_interaction(
     ratings = pd.read_csv(
         interaction_path,
         sep=",",
+        header=0,
         names=["user_id", "item_id", "rating", "timestamp"],
     )
     
@@ -175,7 +171,7 @@ def preprocess_interaction(
     
     log_with_color(logger, "INFO", f"{prefix} #data points before filter: {ratings.shape[0]}", "red")
     log_with_color(logger, "INFO", f"{prefix} #users before filter: {len(set(ratings['user_id'].values))}", "red")
-    log_with_color(logger, "INFO", f"{prefix} #items before filter: {len(set(ratings['item_id'].values))}", "blue")
+    log_with_color(logger, "INFO", f"{prefix} #items before filter: {len(set(ratings['item_id'].values))}", "red")
 
     # Calculate interaction counts
     item_id_count = (
@@ -195,7 +191,7 @@ def preprocess_interaction(
     log_with_color(logger, "INFO", f"Applying filters: min_interactions={min_interactions}, min_date={min_date}", "yellow")
     
     # Date filter
-    ratings['timestamp'] = pd.to_datetime(ratings['timestamp'], unit='s')
+    ratings['timestamp'] = pd.to_datetime(ratings['timestamp'], unit='ms')
     ratings = ratings[ratings['timestamp'] >= min_date]
     
     # Join count information
@@ -220,14 +216,25 @@ def preprocess_interaction(
     
     # Save processed data
     log_with_color(logger, "INFO", f"Saving processed interaction data to: {output_interaction_path}", "cyan")
-    ratings.to_csv(output_interaction_path, index=False, header=True)
+    ratings['timestamp'] = ratings['timestamp'].astype('int64') // 10**6
+    ratings.to_csv(output_interaction_path, index=False, header=True, compression="gzip")
     
     # Filter and save item data
     valid_items = ratings['item_id'].unique()
-    filtered_item = item[item['item_id'].isin(valid_items)]
+    item = item[item['item_id'].isin(valid_items)]
     
+    if max_item_description_len > 0 and tokenizer_path is not None:
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+        item.loc[:, "item_text"] = item.apply(lambda x: x.loc['title'] + x.loc['description'], axis=1)
+        item.loc[:, "truncated_description"] = item.loc[:, "item_text"].progress_apply(lambda x: tokenizer.encode(x)[:max_item_description_len])
+        item.loc[:, "truncated_description"] = item.loc[:, "truncated_description"].progress_apply(lambda x: tokenizer.decode(x))
+        item.loc[:, "truncated_description"] = item.progress_apply(lambda x: x["truncated_description"].split(x["title"], 1)[-1], axis=1)
+        item.loc[:, "description"] = item.progress_apply(lambda x: x["truncated_description"] + "..." if len(x["truncated_description"]) != len(x["description"]) else x["description"], axis=1)
+        item = item.drop(columns=["item_text", "truncated_description"])
+
     log_with_color(logger, "INFO", f"Saving processed item data to: {output_item_path}", "cyan")
-    filtered_item.to_csv(output_item_path, index=False)
+    item.to_csv(output_item_path, index=False, compression="gzip")
     
     log_with_color(logger, "INFO", f"Preprocessing completed for {prefix}", "green")
 
@@ -242,10 +249,10 @@ def validate_paths(file_path: str, domain: str) -> tuple[str, str, str, str]:
     Returns:
         Tuple of (input_ratings_path, input_item_path, output_ratings_path, output_item_path)
     """
-    input_ratings_path = f"{file_path}/ratings_{domain}.csv"
-    input_item_path = f"{file_path}/meta_{domain}.json.gz"
-    output_ratings_path = f"data/dataset/amazon_{domain}.csv"
-    output_item_path = f"data/information/amazon_{domain}.csv"
+    input_ratings_path = f"{file_path}/{domain}.csv.gz"
+    input_item_path = f"{file_path}/meta_{domain}.jsonl.gz"
+    output_ratings_path = f"data/dataset/amazon_{domain}.csv.gz"
+    output_item_path = f"data/information/amazon_{domain}.csv.gz"
     
     # Validate input files exist
     if not os.path.exists(input_ratings_path):
@@ -287,7 +294,7 @@ def main():
     parser.add_argument(
         "--min_date", 
         type=str, 
-        default="2012-12-01",
+        default="2020-01-01",
         help="Minimum date filter for interactions (YYYY-MM-DD format)"
     )
     
@@ -297,6 +304,20 @@ def main():
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Logging level"
+    )
+
+    parser.add_argument(
+        "--max_item_description_len",
+        type=int,
+        default=64,
+        help="Maximum length of item description"
+    )
+
+    parser.add_argument(
+        "--tokenizer_path",
+        type=str,
+        default="Qwen/Qwen3-0.6B",
+        help="Tokenizer path"
     )
     
     args = parser.parse_args()
@@ -322,7 +343,9 @@ def main():
             output_item_path=output_item_path,
             prefix=args.domain,
             min_interactions=args.min_interactions,
-            min_date=args.min_date
+            min_date=args.min_date,
+            max_item_description_len=args.max_item_description_len,
+            tokenizer_path=args.tokenizer_path
         )
         
         log_with_color(logger, "INFO", "Preprocessing completed successfully", "green")
