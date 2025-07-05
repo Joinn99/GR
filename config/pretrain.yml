@@ -18,17 +18,17 @@
 # best to use 3B_full_single_device.yaml for those cases
 
 
-output_dir: /home/zhu_sun/zoo/ckpt
+output_dir: ${OUTPUT_DIR}
 
 
 # Dataset
 dataset:
   - _component_: torchtune.datasets.chat_dataset
-    source: json
-    data_files: /home/zhu_sun/GR/data/messages/amazon_Cell_Phones_and_Accessories_phase2.jsonl
+    source: Joinn/GenerativeRec
+    config: ${DATASET}
+    split: ${SPLIT}
     conversation_column: messages
     conversation_style: openai
-    split: train
     packed: false
 
 seed: 0
@@ -41,13 +41,13 @@ model:
 # Tokenizer
 tokenizer:
   _component_: torchtune.models.qwen3.qwen3_tokenizer
-  path: /home/zhu_sun/zoo/Qwen3-0.6B/vocab.json
-  merges_file: /home/zhu_sun/zoo/Qwen3-0.6B/merges.txt
-  max_seq_len: null
+  path: ${ZOO_PATH}/Qwen3-0.6B/vocab.json
+  merges_file: ${ZOO_PATH}/Qwen3-0.6B/merges.txt
+  max_seq_len: 4096
 
 checkpointer:
   _component_: torchtune.training.FullModelHFCheckpointer
-  checkpoint_dir: /home/zhu_sun/zoo/Qwen3-0.6B/
+  checkpoint_dir: ${ZOO_PATH}/Qwen3-0.6B/
   checkpoint_files: [model.safetensors]
   recipe_checkpoint: null
   output_dir: ${OUTPUT_DIR}
@@ -55,12 +55,12 @@ checkpointer:
 resume_from_checkpoint: False
 
 # Fine-tuning arguments
-batch_size: 4
-epochs: 2
+batch_size: ${BATCH_SIZE}
+epochs: ${EPOCHS}
 
 optimizer:
   _component_: torch.optim.AdamW
-  lr: 2e-5
+  lr: ${LEARNING_RATE}
   fused: true
 loss:
   _component_: torchtune.modules.loss.CEWithChunkedOutputLoss
