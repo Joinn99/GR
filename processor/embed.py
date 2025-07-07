@@ -56,7 +56,7 @@ def parse_arguments():
     parser.add_argument(
         '--model_path',
         type=str,
-        default="/home/Data/zoo/Qwen3-Embedding-0.6B",
+        default="Qwen/Qwen3-Embedding-0.6B",
         help='Path to the embedding model'
     )
     
@@ -137,7 +137,7 @@ def generate_embeddings(model, data, max_length):
 
 def save_embeddings(embeddings, output_path):
     """Save embeddings to file."""
-    np.save(output_path, embeddings.numpy())
+    np.save(output_path, embeddings.cpu().numpy())
     logger.info(f"Embeddings saved to {output_path}")
 
 
@@ -145,7 +145,7 @@ def main():
     """Main function to orchestrate the embedding generation process."""
     args = parse_arguments()
     
-    input_csv = f"data/information/amazon_{args.domain}.csv"
+    input_csv = f"data/information/amazon_{args.domain}.csv.gz"
     output_file = f"data/embedding/amazon_{args.domain}.npy"
 
     logger.info(f"Loading model from: {args.model_path}")

@@ -94,6 +94,14 @@ def parse_arguments():
         default=5,
         help='Maximum number of samples for each user'
     )
+
+    parser.add_argument(
+        '--index',
+        type=str,
+        default='title',
+        choices=['title', 'sem_id'],
+        help='Index of the item information to use'
+    )
     
     return parser.parse_args()
 
@@ -114,7 +122,13 @@ def load_data(domain):
     # Load item information
     item_file = f"data/information/amazon_{domain}.csv.gz"
     logger.info(f"Loading item information from: {item_file}")
-    item = pd.read_csv(item_file).set_index("item_id").fillna("")
+    item = pd.read_csv(item_file)
+
+    sem_id_file = f"data/tokens/amazon_{domain}_index.jsonl"
+    if os.path.exists(sem_id_file):
+        sem_id = pd.read_json(sem_id_file, lines=True)
+        item["sem_id"] = sem_id["sem_id"]
+    item = item.set_index("item_id").fillna("")
     
     return df, item
 
@@ -125,25 +139,27 @@ def assemble_user_data(
         all_item_info,
         max_len=30,
         min_len=5,
-        max_user_sample=5
+        max_user_sample=5,
+        index="title"
     ):
     """Assemble training data for a user's interaction sequence."""
     
     results = []
     item_info = all_item_info.loc[item_id_list]
+    sep = "\n\n" if index == "title" else ","
 
     for i in range(min_len-1, len(item_id_list)):
         idx_start = max(0, i-max_len)
         source_list, target = item_id_list[idx_start:i], item_id_list[i]
         source_infos = item_info.loc[source_list].apply(
-            lambda x: item_template.format(**x), axis=1
+            lambda x: item_template[index].format(**x), axis=1
         ).tolist()
-        target_info = item_info.loc[target]["title"]
+        target_info = item_info.loc[target][index]
         
         messages = [
             {
                 "role": "user", 
-                "content": prompt_template.format(index="title") + "\n" + "\n\n".join(source_infos)
+                "content": prompt_template.format(index=index) + "\n" + "\n\n".join(source_infos)
             },
             {
                 "role": "assistant", 
@@ -158,9 +174,12 @@ def assemble_user_data(
     return results
 
 
-def save_data(data, domain, phase, mode="w"):
+def save_data(data, domain, phase, index, mode="w"):
     """Save the generated data to file."""
-    output_file = f"data/messages/amazon_{domain}_{phase}.jsonl.gz"
+    if index == "title":
+        output_file = f"data/messages/amazon_{domain}_{phase}.jsonl.gz"
+    elif index == "sem_id":
+        output_file = f"data/sequences/amazon_{domain}_{phase}.jsonl.gz"
     
     if not os.path.exists(os.path.dirname(output_file)):
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
@@ -181,13 +200,24 @@ def main():
     df, item = load_data(args.domain)
     random.seed(0)
     # Generate training data
-    output_data = df.progress_apply(lambda x: assemble_user_data(x["item_id"], x["timestamp"], item, max_len=args.max_len, min_len=args.min_len, max_user_sample=args.max_user_sample), axis=1)
-    output_data = pd.DataFrame(output_data.explode().tolist(), columns=["messages", "timestamp", "item_id"])
+    output_data = df.progress_apply(
+        lambda x: assemble_user_data(
+            x["item_id"], x["timestamp"], item,
+            max_len=args.max_len, min_len=args.min_len,
+            max_user_sample=args.max_user_sample,
+            index=args.index
+        ), axis=1
+    )
+    output_data = pd.DataFrame(
+        output_data.explode().tolist(),
+        columns=["messages", "timestamp", "item_id"]
+    )
+
     data_split = time_split_data(output_data)
     for phase, df_phase in data_split.items():
         if phase == "test":
             df_phase = df_phase.sort_values(by="timestamp").groupby(level=0).agg("last")        
-        save_data(df_phase.sort_values(by="timestamp"), args.domain, phase)
+        save_data(df_phase.sort_values(by="timestamp"), args.domain, phase, args.index)
     
     logger.info("Data generation completed successfully!")
 

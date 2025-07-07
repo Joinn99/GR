@@ -4,7 +4,13 @@ prompt_template = """Given the user's historical interactive items arranged in c
 User's historical interactive items: 
 """
 
-item_template = """Title: {title}
-Description: {description}"""
+item_template = {
+    "title": """Title: {title}
+Description: {description}""",
+    "sem_id": """{sem_id}"""
+}
 
-prediction_template = """{title}"""
+prediction_template = {
+    "title": """{title}""",
+    "sem_id": """{sem_id}"""
+}
