@@ -23,15 +23,14 @@ output_dir: ${OUTPUT_DIR}
 # Dataset
 dataset:
   - _component_: torchtune.datasets.chat_dataset
-    source: Joinn/GenerativeRec
-    name: ${DATASET}
-    split: ${SPLIT}
+    source: json
+    data_files: /home/Data/tjwei/GR/data/messages/amazon_Cell_Phones_and_Accessories_pretrain.jsonl.gz
     conversation_column: messages
     conversation_style: openai
     packed: false
 
 seed: 0
-shuffle: True
+shuffle: False
 
 # Model arguments
 model:

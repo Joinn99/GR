@@ -132,6 +132,19 @@ def load_data(domain):
     
     return df, item
 
+def formulate_message(item_info, source_list, target, index, index_prompt=None):
+    if not index_prompt:
+        index_prompt = index
+    sep = "\n\n" if index_prompt == "title" else ","
+    source_infos = item_info.loc[source_list].apply(
+        lambda x: item_template[index_prompt].format(**x), axis=1
+    ).tolist()
+    target_info = item_info.loc[target][index]
+    messages = [
+        {"role": "user", "content": prompt_template.format(index=index) + "\n" + sep.join(source_infos)},
+        {"role": "assistant", "content": target_info}
+    ]
+    return messages
 
 def assemble_user_data(
         item_id_list,
@@ -145,31 +158,40 @@ def assemble_user_data(
     """Assemble training data for a user's interaction sequence."""
     
     results = []
-    item_info = all_item_info.loc[item_id_list]
-    sep = "\n\n" if index == "title" else ","
+    item_info = all_item_info.loc[item_id_list]    
 
     for i in range(min_len-1, len(item_id_list)):
         idx_start = max(0, i-max_len)
-        source_list, target = item_id_list[idx_start:i], item_id_list[i]
-        source_infos = item_info.loc[source_list].apply(
-            lambda x: item_template[index].format(**x), axis=1
-        ).tolist()
-        target_info = item_info.loc[target][index]
-        
-        messages = [
+        results.append(
             {
-                "role": "user", 
-                "content": prompt_template.format(index=index) + "\n" + "\n\n".join(source_infos)
-            },
-            {
-                "role": "assistant", 
-                "content": target_info
+                "messages": formulate_message(item_info, item_id_list[idx_start:i], item_id_list[i], index),
+                "timestamp": timestamp_list[i],
+                "item_id": item_id_list[i],
+                "aux": False
             }
-        ]
-        if messages:
-            results.append({"messages": messages, "timestamp": timestamp_list[i], "item_id": target})
-    if len(results) > max_user_sample:
-        results = random.sample(results, max_user_sample)
+        )
+        if index == "sem_id":
+            results.append(
+                {
+                    "messages": formulate_message(item_info, item_id_list[idx_start:i], item_id_list[i], "title", index),
+                    "timestamp": timestamp_list[i],
+                    "item_id": item_id_list[i],
+                    "aux": True
+                }
+            )
+            results.append(
+                {
+                    "messages": formulate_message(item_info, item_id_list[idx_start:i], item_id_list[i], index, "title"),
+                    "timestamp": timestamp_list[i],
+                    "item_id": item_id_list[i],
+                    "aux": True
+                }
+            )
+
+    sample_limit = max_user_sample if index == "title" else 3*max_user_sample
+
+    if len(results) > sample_limit:
+        results = random.sample(results, sample_limit)
     
     return results
 
@@ -208,15 +230,19 @@ def main():
             index=args.index
         ), axis=1
     )
+    output_data = output_data.explode()
     output_data = pd.DataFrame(
-        output_data.explode().tolist(),
-        columns=["messages", "timestamp", "item_id"]
+        output_data.tolist(),
+        columns=["messages", "timestamp", "item_id", "aux"],
+        index=output_data.index
     )
 
     data_split = time_split_data(output_data)
     for phase, df_phase in data_split.items():
         if phase == "test":
-            df_phase = df_phase.sort_values(by="timestamp").groupby(level=0).agg("last")        
+            df_phase = df_phase[df_phase["aux"]]
+            df_phase = df_phase.sort_values(by="timestamp").groupby(level=0).agg("last")
+        df_phase = df_phase.reset_index().drop(columns=["aux"])
         save_data(df_phase.sort_values(by="timestamp"), args.domain, phase, args.index)
     
     logger.info("Data generation completed successfully!")
