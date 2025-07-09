@@ -24,10 +24,18 @@ output_dir: ${OUTPUT_DIR}
 dataset:
   - _component_: torchtune.datasets.chat_dataset
     source: json
-    data_files: /home/Data/tjwei/GR/data/messages/amazon_Cell_Phones_and_Accessories_pretrain.jsonl.gz
+    data_files: /home/Data/tjwei/GR/data/sequences/amazon_${DATASET}_${SPLIT}.jsonl.gz
     conversation_column: messages
     conversation_style: openai
     packed: false
+
+  # - _component_: torchtune.datasets.chat_dataset
+  #   source: Joinn/GenerativeRec
+  #   name: ${DATASET}
+  #   split: ${SPLIT}
+  #   conversation_column: messages
+  #   conversation_style: openai
+  #   packed: false
 
 seed: 0
 shuffle: False
@@ -41,6 +49,7 @@ tokenizer:
   _component_: torchtune.models.qwen3.qwen3_tokenizer
   path: ${ZOO_PATH}/Qwen3-0.6B/vocab.json
   merges_file: ${ZOO_PATH}/Qwen3-0.6B/merges.txt
+  special_tokens_path: /home/Data/tjwei/GR/config/added_tokens.json
   max_seq_len: 4096
 
 checkpointer:
@@ -70,6 +79,9 @@ lr_scheduler:
 
 # Training env
 device: cuda
+
+resize_token_embeddings: true
+resized_vocab_size: 152704
 
 # Memory management
 enable_activation_checkpointing: true  # True reduces memory

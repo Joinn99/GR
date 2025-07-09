@@ -7,10 +7,10 @@ User's historical interactive items:
 item_template = {
     "title": """Title: {title}
 Description: {description}""",
-    "sem_id": """{sem_id}"""
+    "sem_id": """Item Index: {sem_id}"""
 }
 
 prediction_template = {
-    "title": """{title}""",
-    "sem_id": """{sem_id}"""
+    "title": """Title: {title}""",
+    "sem_id": """Item Index: {sem_id}"""
 }

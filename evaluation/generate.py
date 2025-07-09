@@ -1,5 +1,13 @@
 import argparse
 import pandas as pd
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
 
 def get_llm(
     model_path,
@@ -8,9 +16,10 @@ def get_llm(
     llm = LLM(
         model=model_path,
         tensor_parallel_size=1,
-        gpu_memory_utilization=0.95,
+        gpu_memory_utilization=0.8,
         max_model_len=4096,
-        trust_remote_code=True
+        trust_remote_code=True,
+        enforce_eager=True,
     )
     return llm
 
@@ -28,6 +37,8 @@ def batch_chat(
     output = llm.chat(
         messages=messages,
         sampling_params=sampling_params,
+        continue_final_message=True,
+        add_generation_prompt=False,
         chat_template_kwargs={"enable_thinking": False},
     )
     return [e.outputs[0].text for e in output]
@@ -41,15 +52,22 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.mode == "text":
-        input_path = f"/home/Data/tjwei/GR/data/messages/{args.domain}_test.jsonl.gz"
+        input_path = f"data/messages/amazon_{args.domain}_test.jsonl.gz"
     else:
-        input_path = f"/home/Data/tjwei/GR/data/sequences/{args.domain}_test.jsonl.gz"
+        input_path = f"data/sequences/amazon_{args.domain}_test.jsonl.gz"
 
-    output_path = f"/home/Data/tjwei/GR/data/outputs/{args.domain}_test_{args.mode}.csv"
+    output_path = f"data/outputs/amazon_{args.domain}_test_{args.mode}.csv"
 
+    logger.info(f"Loading data from {input_path}")
     df = pd.read_json(input_path, lines=True)
+    logger.info(f"Loaded {len(df)} rows")
     llm = get_llm(args.model_path)
+    prompt_prefix = "Title: " if args.mode == "text" else "Item Index: "
+    df["messages"] = df["messages"].apply(lambda x: x[:-1] + [{"role": "assistant", "content": prompt_prefix}])
+    logger.info(f"Batch chatting...")
     outputs = batch_chat(llm, df["messages"].tolist(), args.mode)
+    logger.info(f"Batch chatting done")
     df["output"] = outputs
     df.drop(columns=["messages"], inplace=True)
+    logger.info(f"Saving to {output_path}")
     df.to_csv(output_path, index=False)

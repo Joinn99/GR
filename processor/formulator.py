@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from utils import time_split_data
 
-from prompt import prompt_template, item_template
+from prompt import prompt_template, item_template, prediction_template
 
 tqdm.pandas()
 
@@ -139,7 +139,7 @@ def formulate_message(item_info, source_list, target, index, index_prompt=None):
     source_infos = item_info.loc[source_list].apply(
         lambda x: item_template[index_prompt].format(**x), axis=1
     ).tolist()
-    target_info = item_info.loc[target][index]
+    target_info = prediction_template[index].format(**{index: item_info.loc[target][index]})
     messages = [
         {"role": "user", "content": prompt_template.format(index=index) + "\n" + sep.join(source_infos)},
         {"role": "assistant", "content": target_info}
@@ -240,7 +240,7 @@ def main():
     data_split = time_split_data(output_data)
     for phase, df_phase in data_split.items():
         if phase == "test":
-            df_phase = df_phase[df_phase["aux"]]
+            df_phase = df_phase[~df_phase["aux"]]
             df_phase = df_phase.sort_values(by="timestamp").groupby(level=0).agg("last")
         df_phase = df_phase.reset_index().drop(columns=["aux"])
         save_data(df_phase.sort_values(by="timestamp"), args.domain, phase, args.index)
