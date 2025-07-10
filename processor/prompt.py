@@ -14,3 +14,18 @@ prediction_template = {
     "title": """Title: {title}""",
     "sem_id": """Item Index: {sem_id}"""
 }
+
+t2i_prompt = """Given the following item title and desctription, please output the corresponding Item Index.
+Examples:
+{examples}
+"""
+
+i2t_prompt = """Given the following item index, please output the corresponding item title and desctription.
+Examples:
+{examples}
+"""
+
+text_template = """Title: {title}
+Description: {description}"""
+
+index_template = """Item Index: {index}"""

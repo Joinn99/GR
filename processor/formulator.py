@@ -242,6 +242,9 @@ def main():
         if phase == "test":
             df_phase = df_phase[~df_phase["aux"]]
             df_phase = df_phase.sort_values(by="timestamp").groupby(level=0).agg("last")
+        else:
+            if args.index == "sem_id":
+                df_phase = df_phase.groupby(["user_id", "item_id", "timestamp"]).sample(n=1)
         df_phase = df_phase.reset_index().drop(columns=["aux"])
         save_data(df_phase.sort_values(by="timestamp"), args.domain, phase, args.index)
     

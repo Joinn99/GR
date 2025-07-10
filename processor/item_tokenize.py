@@ -276,6 +276,7 @@ if __name__ == "__main__":
     last_id = index.groupby(list(index.columns)).cumcount()
     logger.info(f"Saving index to {index_path}, max cluster size: {last_id.max()}")
     index[len(index.columns)] = last_id
+    index = index.rename(columns={c: f"ID_{chr(c+97)}" for c in range(len(index.columns))})
     index["sem_id"] = index.apply(lambda x: "".join([f"<{chr(c+97)}_{x[c]}>" for c in range(len(index.columns))]), axis=1)
     index.to_json(index_path, orient="records", lines=True)
 
