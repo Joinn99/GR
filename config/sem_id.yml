@@ -24,13 +24,13 @@ output_dir: ${OUTPUT_DIR}
 dataset:
   - _component_: torchtune.datasets.chat_dataset
     source: json
-    data_files: /home/Data/tjwei/GR/data/sequences/amazon_${DATASET}_items.jsonl.gz
+    data_files: /home/Data/tjwei/GR/data/sequences/amazon_${DOMAIN}_items.jsonl.gz
     conversation_column: messages
     conversation_style: openai
     packed: false
   - _component_: torchtune.datasets.chat_dataset
     source: json
-    data_files: /home/Data/tjwei/GR/data/sequences/amazon_${DATASET}_${SPLIT}.jsonl.gz
+    data_files: /home/Data/tjwei/GR/data/sequences/amazon_${DOMAIN}_${SPLIT}.jsonl.gz
     conversation_column: messages
     conversation_style: openai
     packed: false
@@ -65,6 +65,7 @@ checkpointer:
   recipe_checkpoint: null
   output_dir: ${OUTPUT_DIR}
   model_type: QWEN3
+
 resume_from_checkpoint: False
 
 # Fine-tuning arguments

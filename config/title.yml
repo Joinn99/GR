@@ -24,10 +24,11 @@ output_dir: ${OUTPUT_DIR}
 dataset:
   - _component_: torchtune.datasets.chat_dataset
     source: json
-    data_files: /home/Data/tjwei/GR/data/messages/amazon_${DATASET}_${SPLIT}.jsonl.gz
+    data_files: /home/Data/tjwei/GR/data/messages/amazon_${DOMAIN}_${SPLIT}.jsonl.gz
     conversation_column: messages
     conversation_style: openai
     packed: false
+    split: train
 
 seed: 0
 shuffle: False

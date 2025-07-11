@@ -21,11 +21,11 @@ def formulate_t2i_messages(target_rows: pd.DataFrame, example_rows: pd.DataFrame
     ]
     messages = [
         {"role": "user", "content": t2i_prompt.format(examples="\n".join(examples)) + target_item_texts[0]},
-        {"role": "assistant", "content": target_item_ids[0]}
+        {"role": "assistant", "content": "<think>\n\n</think>\n\n" + target_item_ids[0]}
     ]
     for i in range(1, len(target_item_texts)):
         messages.append({"role": "user", "content": target_item_texts[i]})
-        messages.append({"role": "assistant", "content": target_item_ids[i]})
+        messages.append({"role": "assistant", "content": "<think>\n\n</think>\n\n" + target_item_ids[i]})
     return messages
 
 def formulate_i2t_messages(target_rows: pd.DataFrame, example_rows: pd.DataFrame):
@@ -45,11 +45,11 @@ def formulate_i2t_messages(target_rows: pd.DataFrame, example_rows: pd.DataFrame
 
     messages = [
         {"role": "user", "content": i2t_prompt.format(examples="\n".join(examples)) + target_item_ids[0]},
-        {"role": "assistant", "content": target_item_texts[0]}
+        {"role": "assistant", "content": "<think>\n\n</think>\n\n" + target_item_texts[0]}
     ]
     for i in range(1, len(target_item_ids)):
         messages.append({"role": "user", "content": target_item_ids[i]})
-        messages.append({"role": "assistant", "content": target_item_texts[i]})
+        messages.append({"role": "assistant", "content": "<think>\n\n</think>\n\n" + target_item_texts[i]})
     return messages
 
 
