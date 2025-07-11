@@ -142,7 +142,7 @@ def formulate_message(item_info, source_list, target, index, index_prompt=None):
     target_info = prediction_template[index].format(**{index: item_info.loc[target][index]})
     messages = [
         {"role": "user", "content": prompt_template.format(index=index) + "\n" + sep.join(source_infos)},
-        {"role": "assistant", "content": target_info}
+        {"role": "assistant", "content": "<think>\n\n</think>\n\n" + target_info}
     ]
     return messages
 
