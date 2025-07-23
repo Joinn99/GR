@@ -1,18 +1,18 @@
 
 
-prompt_template = """Given the user's historical interactive items arranged in chronological order, please recommend a suitable item for the user. Please output the item {index}.
-User's historical interactive items: 
+prompt_template = """You are a recommendation system. Based on the user's purchase/interaction history shown below (arranged chronologically from oldest to newest), predict a new {index} of the item that the user is most likely to interact with next.
+
+User's historical interactive items:
 """
 
 item_template = {
-    "title": """Title: {title}
-Description: {description}""",
+    "title": """Title: {title}""",
     "sem_id": """Item Index: {sem_id}"""
 }
 
 prediction_template = {
-    "title": """Title: {title}""",
-    "sem_id": """Item Index: {sem_id}"""
+    "title": """Recommended Item Title: {title}""",
+    "sem_id": """Recommended Item Index: {sem_id}"""
 }
 
 t2i_prompt = """Given the following item title and desctription, please output the corresponding Item Index.

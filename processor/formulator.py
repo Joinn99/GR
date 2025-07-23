@@ -135,7 +135,7 @@ def load_data(domain):
 def formulate_message(item_info, source_list, target, index, index_prompt=None):
     if not index_prompt:
         index_prompt = index
-    sep = "\n\n" if index_prompt == "title" else ","
+    sep = "\n" if index_prompt == "title" else "\n"
     source_infos = item_info.loc[source_list].apply(
         lambda x: item_template[index_prompt].format(**x), axis=1
     ).tolist()
