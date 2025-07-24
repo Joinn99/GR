@@ -33,8 +33,8 @@ def batch_chat(
     from vllm import SamplingParams
     sampling_params=SamplingParams(
         temperature=0.0,
-        seed=0,
         max_tokens=32,
+        stop=["\n"],
     )
     output = llm.chat(
         messages=messages,
@@ -55,7 +55,7 @@ def batch_beam_search(
 ):
     from vllm.sampling_params import BeamSearchParams
     sampling_params=BeamSearchParams(
-        temperature=0.7,
+        temperature=0.0,
         beam_width=beam_width,
         max_tokens=max_tokens,
     )
@@ -95,14 +95,17 @@ if __name__ == "__main__":
     logger.info(f"Loaded {len(df)} rows")
     llm = get_llm(args.model_path, beam_width=args.beam_width)
     
-    prompt_prefix = "Title: " if args.mode == "title" else "Item Index: "
-    df["messages"] = df["messages"].apply(lambda x: x[:-1] + [{"role": "assistant", "content": prompt_prefix}])
+    prompt_prefix = "Recommended Item Title:" if args.mode == "title" else "Recommended Item Index: "
     
     logger.info(f"Batch chatting...")
-    outputs = batch_chat(llm, df["messages"].tolist()) if args.mode == "title" else batch_beam_search(llm, df["messages"].tolist(), beam_width=args.beam_width)
+    df["messages"] = df["messages"].apply(lambda x: x[:-1] + [{"role": "assistant", "content": prompt_prefix}])
+    if args.mode == "title":
+        outputs = batch_chat(llm, df["messages"].tolist())
+    else:
+        outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=args.beam_width)
     logger.info(f"Batch chatting done")
     
     df["output"] = outputs
-    df.drop(columns=["messages"], inplace=True)
+    df.drop(columns=["messages", "history"], inplace=True)
     logger.info(f"Saving to {output_path}")
     df.to_csv(output_path, index=False)

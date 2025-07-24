@@ -128,20 +128,20 @@ def load_data(domain):
     if os.path.exists(sem_id_file):
         sem_id = pd.read_json(sem_id_file, lines=True)
         item["sem_id"] = sem_id["sem_id"]
-    item = item.set_index("item_id").fillna("")
+    item = item.set_index("item_id").fillna("NA")
     
     return df, item
 
 def formulate_message(item_info, source_list, target, index, index_prompt=None):
     if not index_prompt:
         index_prompt = index
-    sep = "\n" if index_prompt == "title" else "\n"
+    sep = "\n\n" if index_prompt == "title" else "\n"
     source_infos = item_info.loc[source_list].apply(
         lambda x: item_template[index_prompt].format(**x), axis=1
     ).tolist()
     target_info = prediction_template[index].format(**{index: item_info.loc[target][index]})
     messages = [
-        {"role": "user", "content": prompt_template.format(index=index) + "\n" + sep.join(source_infos)},
+        {"role": "user", "content": prompt_template.format(index="item title" if index == "title" else "item index") + "\n" + sep.join(source_infos)},
         {"role": "assistant", "content": "<think>\n\n</think>\n\n" + target_info}
     ]
     return messages
@@ -167,6 +167,7 @@ def assemble_user_data(
                 "messages": formulate_message(item_info, item_id_list[idx_start:i], item_id_list[i], index),
                 "timestamp": timestamp_list[i],
                 "item_id": item_id_list[i],
+                "history": item_id_list[idx_start:i],
                 "aux": False
             }
         )
@@ -176,6 +177,7 @@ def assemble_user_data(
                     "messages": formulate_message(item_info, item_id_list[idx_start:i], item_id_list[i], "title", index),
                     "timestamp": timestamp_list[i],
                     "item_id": item_id_list[i],
+                    "history": None,
                     "aux": True
                 }
             )
@@ -184,6 +186,7 @@ def assemble_user_data(
                     "messages": formulate_message(item_info, item_id_list[idx_start:i], item_id_list[i], index, "title"),
                     "timestamp": timestamp_list[i],
                     "item_id": item_id_list[i],
+                    "history": None,
                     "aux": True
                 }
             )
@@ -233,7 +236,7 @@ def main():
     output_data = output_data.explode()
     output_data = pd.DataFrame(
         output_data.tolist(),
-        columns=["messages", "timestamp", "item_id", "aux"],
+        columns=["messages", "timestamp", "item_id", "history", "aux"],
         index=output_data.index
     )
 
@@ -243,8 +246,9 @@ def main():
             df_phase = df_phase[~df_phase["aux"]]
             df_phase = df_phase.sort_values(by="timestamp").groupby(level=0).agg("last")
         else:
+            df_phase = df_phase.drop(columns=["history"])
             if args.index == "sem_id":
-                df_phase = df_phase.groupby(["user_id", "item_id", "timestamp"]).sample(n=1)
+                df_phase = df_phase.groupby(["user_id", "item_id", "timestamp", "aux"]).sample(n=1)
         df_phase = df_phase.reset_index().drop(columns=["aux"])
         save_data(df_phase.sort_values(by="timestamp"), args.domain, phase, args.index)
     

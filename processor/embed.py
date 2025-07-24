@@ -111,20 +111,31 @@ def initialize_model(model_path, gpu_id, gpu_memory_utilization, max_model_len):
     
     return model
 
-def get_input(item):
+def get_input(item, with_description=True):
     """Process input item and return formatted text for embedding."""
     instruct = "Compress the following sentence into embedding.\n"
-    text = f"{instruct}Title: {item['title']}\nDescription: {item['description']}"
+    if with_description:
+        text = f"{instruct}Title: {item['title']}\nDescription: {item['description']}"
+    else:
+        if isinstance(item, str):
+            text = f"{instruct}Title: {item}"
+        else:
+            text = f"{instruct}Title: {item['title']}"
     return text
 
 
-def generate_embeddings(model, data, max_length):
+def generate_embeddings(model, data, with_description=True):
     """Generate embeddings for the input data."""
     # Process all items
-    processed_inputs = data.apply(
-        lambda x: get_input(x), 
-        axis=1
-    ).tolist()
+    if isinstance(data, pd.Series):
+        processed_inputs = data.apply(
+            lambda x: get_input(x, with_description)
+        ).tolist()
+    else:
+        processed_inputs = data.apply(
+            lambda x: get_input(x, with_description), 
+            axis=1
+        ).tolist()
     
     # Generate embeddings
     outputs = model.embed(processed_inputs)
@@ -160,7 +171,7 @@ def main():
     data = pd.read_csv(input_csv)
     
     logger.info(f"Generating embeddings for {len(data)} items...")
-    embeddings = generate_embeddings(model, data, args.max_length)
+    embeddings = generate_embeddings(model, data, with_description=False)
     
     logger.info(f"Saving embeddings to: {output_file}")
     save_embeddings(embeddings, output_file)

@@ -6,7 +6,8 @@ User's historical interactive items:
 """
 
 item_template = {
-    "title": """Title: {title}""",
+    "title": """Title: {title}
+Description: {description}""",
     "sem_id": """Item Index: {sem_id}"""
 }
 
