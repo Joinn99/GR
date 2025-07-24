@@ -262,17 +262,34 @@ if __name__ == "__main__":
     embeddings = torch.from_numpy(embeddings).float().to(device)
     
     logger.info(f"Fitting model with {args.n_layers} layers and cluster sizes {args.cluster_sizes}")
-    model = MultiResidualBalancedKMeans(
-        n_clusters=args.cluster_sizes,
-        n_layers=args.n_layers,
-        max_iter=1000,
-        tol=1e-4,
-        seed=0,
-        verbose=True,
-    )
-    labels_layers = model.fit_predict(embeddings)
+    # model = MultiResidualBalancedKMeans(
+    #     n_clusters=args.cluster_sizes,
+    #     n_layers=args.n_layers,
+    #     max_iter=1000,
+    #     tol=1e-4,
+    #     seed=0,
+    #     verbose=True,
+    # )
+    # labels_layers = model.fit_predict(embeddings)
 
-    index = pd.DataFrame(torch.stack(labels_layers, dim=0).to("cpu").numpy().transpose(1, 0))
+    # index = pd.DataFrame(torch.stack(labels_layers, dim=0).to("cpu").numpy().transpose(1, 0))
+
+    from vector_quantize_pytorch import ResidualVQ
+
+    residual_vq = ResidualVQ(
+        dim = 4096,
+        num_quantizers = 3,      # specify number of quantizers
+        codebook_size = 256,    # codebook size
+        kmeans_init = True,   # set to True
+        kmeans_iters = 10,     # number of kmeans iterations to calculate the centroids for the codebook on init
+        # stochastic_sample_codes = True,
+        # sample_codebook_temp = 5e-4,         # temperature for stochastically sampling codes, 0 would be equivalent to non-stochastic
+    ).to(device)
+    quantized, indices, commit_loss = residual_vq(embeddings)
+    logger.info(f"Commit loss: {commit_loss}")
+
+    index = pd.DataFrame(indices.to("cpu").numpy())
+
     last_id = index.groupby(list(index.columns)).cumcount()
     logger.info(f"Saving index to {index_path}, max cluster size: {last_id.max()}")
     index[len(index.columns)] = last_id
@@ -281,7 +298,7 @@ if __name__ == "__main__":
     index.to_json(index_path, orient="records", lines=True)
 
     logger.info(f"Saving model to {model_path}")
-    np.savez(
-        f"data/tokens/amazon_{args.domain}_model.npz", 
-        **{f"{chr(i+97)}": e.cpu().numpy() for i, e in enumerate(model.centroid_layers_)}
-    )
+    # np.savez(
+    #     f"data/tokens/amazon_{args.domain}_model.npz", 
+    #     **{f"{chr(i+97)}": e.cpu().numpy() for i, e in enumerate(model.centroid_layers_)}
+    # )
