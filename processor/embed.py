@@ -171,7 +171,7 @@ def main():
     data = pd.read_csv(input_csv)
     
     logger.info(f"Generating embeddings for {len(data)} items...")
-    embeddings = generate_embeddings(model, data, with_description=False)
+    embeddings = generate_embeddings(model, data, with_description=True)
     
     logger.info(f"Saving embeddings to: {output_file}")
     save_embeddings(embeddings, output_file)

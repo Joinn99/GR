@@ -1,6 +1,7 @@
 import argparse
 import pandas as pd
 import logging
+from tqdm import tqdm
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,10 +66,19 @@ def batch_beam_search(
             messages, add_generation_prompt=False, continue_final_message=True
         )
     ]
-    outputs = llm.beam_search(
-        prompts=prompts,
-        params=sampling_params,
-    )
+    small_batch_size = 64
+    outputs = []
+    for i in tqdm(range(0, len(prompts), small_batch_size)):
+        batch_prompts = prompts[i:i+small_batch_size]
+        batch_outputs = llm.beam_search(
+            prompts=batch_prompts,
+            params=sampling_params,
+        )
+        outputs.extend(batch_outputs)
+    # outputs = llm.beam_search(
+    #     prompts=prompts,
+    #     params=sampling_params,
+    # )
     result_rankings = [
         [tokenizer.decode(s.tokens[-max_tokens:]) for s in output.sequences]
         for output in outputs
@@ -100,9 +110,9 @@ if __name__ == "__main__":
     logger.info(f"Batch chatting...")
     df["messages"] = df["messages"].apply(lambda x: x[:-1] + [{"role": "assistant", "content": prompt_prefix}])
     if args.mode == "title":
-        outputs = batch_chat(llm, df["messages"].tolist())
+        outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=args.beam_width, max_tokens=32)
     else:
-        outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=args.beam_width)
+        outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=args.beam_width, max_tokens=4)
     logger.info(f"Batch chatting done")
     
     df["output"] = outputs

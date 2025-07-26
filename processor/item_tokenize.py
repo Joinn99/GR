@@ -298,6 +298,7 @@ if __name__ == "__main__":
     index.to_json(index_path, orient="records", lines=True)
 
     logger.info(f"Saving model to {model_path}")
+    torch.save(residual_vq.state_dict(), model_path)
     # np.savez(
     #     f"data/tokens/amazon_{args.domain}_model.npz", 
     #     **{f"{chr(i+97)}": e.cpu().numpy() for i, e in enumerate(model.centroid_layers_)}

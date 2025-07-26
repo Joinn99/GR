@@ -2,15 +2,12 @@ import pandas as pd
 import numpy as np
 import torch
 
-from processor.embed import initialize_model, generate_embeddings
+from embed import initialize_model, generate_embeddings
 
 def map_history_id(eval_data, item_set):
     item_set_ids = item_set.reset_index().set_index("item_id")
     history_ids = eval_data["history"].apply(lambda x: item_set_ids.loc[x, "index"].tolist())
     return history_ids
-
-
-
 
 def title_eval(domain):
     item_set_path = f"/home/Data/tjwei/GR/data/information/amazon_{domain}.csv.gz"
@@ -69,14 +66,14 @@ def sem_id_eval(domain):
     sem_id = pd.read_json(sem_id_path, lines=True)
 
     result["output"] = result["output"].apply(lambda x: eval(x))
-    item["sem_id"] = sem_id["sem_id"]
+    item["sem_id"] = sem_id["sem_id"].apply(str.strip)
     item = item.set_index("item_id")
     result = result.join(item.loc[:, ["sem_id"]], on="item_id", how="left")
-
-    calculate_metrics(result, "item_rankings", "sem_id")
+    print(result.head())
+    metrics = calculate_metrics(result, "output", "sem_id")
+    print(metrics)
 
 def id_match(results, target):
-    # target = target.split("<d_")[0]
     output = [target in e for e in results]
     return output
     
@@ -91,3 +88,6 @@ def calculate_metrics(result_df, item_rankngs_col, target_col, top_k=[20,50,100]
         metrics[f"NDCG@{str(k)}"] = ndcg
         metrics[f"Recall@{str(k)}"] = recall
     return metrics
+
+if __name__ == "__main__":
+    sem_id_eval("Video_Games")
