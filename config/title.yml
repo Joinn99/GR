@@ -24,7 +24,7 @@ output_dir: ${OUTPUT_DIR}
 dataset:
   - _component_: torchtune.datasets.chat_dataset
     source: json
-    data_files: /home/Data/tjwei/GR/data/messages/amazon_${DOMAIN}_${SPLIT}.jsonl.gz
+    data_files: /data/tjwei/GR/data/messages/amazon_${DOMAIN}_${SPLIT}.jsonl.gz
     conversation_column: messages
     conversation_style: openai
     packed: false
@@ -46,8 +46,8 @@ tokenizer:
 
 checkpointer:
   _component_: torchtune.training.FullModelHFCheckpointer
-  checkpoint_dir: ${ZOO_PATH}/Qwen3-0.6B/
-  checkpoint_files: [model.safetensors]
+  checkpoint_dir: ${CHECKPOINT_PATH}
+  checkpoint_files: [${TENSOR_NAME}]
   recipe_checkpoint: null
   output_dir: ${OUTPUT_DIR}
   model_type: QWEN3
