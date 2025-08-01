@@ -254,7 +254,7 @@ if __name__ == "__main__":
 
     embedding_path = f"data/embedding/amazon_{args.domain}.npy"
     index_path = f"data/tokens/amazon_{args.domain}_index.jsonl"
-    model_path = f"data/tokens/amazon_{args.domain}_model.npz"
+    model_path = f"data/tokens/amazon_{args.domain}_model.pth"
     
     embeddings = np.load(embedding_path)
 

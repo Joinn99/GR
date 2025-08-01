@@ -1,5 +1,6 @@
 import argparse
 import pandas as pd
+import numpy as np
 import logging
 from tqdm import tqdm
 
@@ -92,17 +93,20 @@ if __name__ == "__main__":
     parser.add_argument("--split", type=str, default="phase1")
     parser.add_argument("--domain", type=str, default="Cell_Phones_and_Accessories")
     parser.add_argument("--beam_width", type=int, default=20)
+    parser.add_argument("--sample_num", type=int, default=2000)
     args = parser.parse_args()
+
+    np.random.seed(0)
 
     if args.mode == "title":
         input_path = f"data/messages/amazon_{args.domain}_test.jsonl.gz"
     else:
         input_path = f"data/sequences/amazon_{args.domain}_test.jsonl.gz"
 
-    output_path = f"data/outputs/amazon_{args.domain}_{args.split}_{args.mode}.csv"
+    output_path = f"data/outputs/amazon_{args.domain}_{args.split}_{args.mode}.jsonl"
 
     logger.info(f"Loading data from {input_path}")
-    df = pd.read_json(input_path, lines=True)
+    df = pd.read_json(input_path, lines=True).sample(n=args.sample_num, random_state=0)
     logger.info(f"Loaded {len(df)} rows")
     llm = get_llm(args.model_path, beam_width=args.beam_width)
     
@@ -119,4 +123,4 @@ if __name__ == "__main__":
     df["output"] = outputs
     df.drop(columns=["messages", "history"], inplace=True)
     logger.info(f"Saving to {output_path}")
-    df.to_csv(output_path, index=False)
+    df.reset_index().to_json(output_path, lines=True)
