@@ -89,6 +89,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, default="/home/Data/zoo/Qwen3-0.6B")
     parser.add_argument("--mode", type=str, default="title")
+    parser.add_argument("--split", type=str, default="phase1")
     parser.add_argument("--domain", type=str, default="Cell_Phones_and_Accessories")
     parser.add_argument("--beam_width", type=int, default=20)
     args = parser.parse_args()
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     else:
         input_path = f"data/sequences/amazon_{args.domain}_test.jsonl.gz"
 
-    output_path = f"data/outputs/amazon_{args.domain}_test_{args.mode}.csv"
+    output_path = f"data/outputs/amazon_{args.domain}_{args.split}_{args.mode}.csv"
 
     logger.info(f"Loading data from {input_path}")
     df = pd.read_json(input_path, lines=True)

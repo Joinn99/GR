@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import torch
+from datetime import datetime, timezone, timedelta
 
 from embed import initialize_model, generate_embeddings
 
@@ -31,7 +32,7 @@ def title_eval(domain):
     item_embeddings = generate_embeddings(model, item_set["title"], with_description=False)
 
     batch_size = 1024
-    TOP_K = 100
+    TOP_K = 50
 
     all_closest_items = []
 
@@ -55,8 +56,8 @@ def title_eval(domain):
     eval_set["item_rankings"] = all_closest_items
 
 
-def sem_id_eval(domain):
-    result_path = f"data/outputs/amazon_{domain}_test_sem_id.csv"
+def sem_id_eval(domain, split):
+    result_path = f"data/outputs/amazon_{domain}_{split}_sem_id.csv"
     item_path = f"data/information/amazon_{domain}.csv.gz"
     sem_id_path = f"data/tokens/amazon_{domain}_index.jsonl"
 
@@ -69,25 +70,30 @@ def sem_id_eval(domain):
     item["sem_id"] = sem_id["sem_id"].apply(str.strip)
     item = item.set_index("item_id")
     result = result.join(item.loc[:, ["sem_id"]], on="item_id", how="left")
-    print(result.head())
     metrics = calculate_metrics(result, "output", "sem_id")
-    print(metrics)
+    metrics.update({
+        "domain": domain, "split": split, "mode": "sem_id", 
+        "time": datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+    })
+    return metrics
 
 def id_match(results, target):
     output = [target in e for e in results]
     return output
     
-def calculate_metrics(result_df, item_rankngs_col, target_col, top_k=[20,50,100]):
+def calculate_metrics(result_df, item_rankngs_col, target_col, top_k=[10,20,50]):
     matching = result_df.apply(lambda x: id_match(x[item_rankngs_col], x[target_col]), axis=1)
     metrics = {}
     for k in top_k:
         matching_k = matching.apply(lambda x: x[:k])
         ndcg = matching_k.apply(lambda x: np.sum(x / np.log2(np.arange(2, len(x) + 2)))).mean()
         recall = matching_k.apply(lambda x: np.sum(x)).mean()
-        print(f"NDCG@{str(k)}: {ndcg}, Recall@{str(k)}: {recall}")
+        mrr = matching_k.apply(lambda x: np.sum(1 / (np.arange(1, len(x) + 1)) * x)).mean()
+        print(f"NDCG@{str(k)}: {round(ndcg, 6)}, Recall@{str(k)}: {round(recall, 6)}, MRR@{str(k)}: {round(mrr, 6)}")
         metrics[f"NDCG@{str(k)}"] = ndcg
         metrics[f"Recall@{str(k)}"] = recall
+        metrics[f"MRR@{str(k)}"] = mrr
     return metrics
 
 if __name__ == "__main__":
-    sem_id_eval("Video_Games")
+    metrics = sem_id_eval("Sports_and_Outdoors", "phase1")
