@@ -24,14 +24,14 @@ output_dir: ${OUTPUT_DIR}
 dataset:
   - _component_: torchtune.datasets.chat_dataset
     source: json
-    data_files: /data/tjwei/GR/data/sequences/amazon_${DOMAIN}_items.jsonl.gz
+    data_files: ${PWD}/data/sequences/amazon_${DOMAIN}_items.jsonl.gz
     conversation_column: messages
     conversation_style: openai
     packed: false
     split: train[:10%]
   - _component_: torchtune.datasets.chat_dataset
     source: json
-    data_files: /data/tjwei/GR/data/sequences/amazon_${DOMAIN}_${SPLIT}.jsonl.gz
+    data_files: ${PWD}/data/sequences/amazon_${DOMAIN}_${SPLIT}.jsonl.gz
     conversation_column: messages
     conversation_style: openai
     packed: false
@@ -56,7 +56,7 @@ tokenizer:
   _component_: torchtune.models.qwen3.qwen3_tokenizer
   path: ${ZOO_PATH}/Qwen3-0.6B/vocab.json
   merges_file: ${ZOO_PATH}/Qwen3-0.6B/merges.txt
-  special_tokens_path: /data/tjwei/GR/config/added_tokens.json
+  special_tokens_path: ${PWD}/config/added_tokens.json
   max_seq_len: 4096
 
 checkpointer:

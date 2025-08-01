@@ -47,7 +47,7 @@ tokenizer:
 checkpointer:
   _component_: torchtune.training.FullModelHFCheckpointer
   checkpoint_dir: ${CHECKPOINT_PATH}
-  checkpoint_files: [model.safetensors]
+  checkpoint_files: [model-00001-of-00001.safetensors]
   recipe_checkpoint: null
   output_dir: ${OUTPUT_DIR}
   model_type: QWEN3

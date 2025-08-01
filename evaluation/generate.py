@@ -106,7 +106,9 @@ if __name__ == "__main__":
     output_path = f"data/outputs/amazon_{args.domain}_{args.split}_{args.mode}.jsonl"
 
     logger.info(f"Loading data from {input_path}")
-    df = pd.read_json(input_path, lines=True).sample(n=args.sample_num, random_state=0)
+    df = pd.read_json(input_path, lines=True)
+    if args.sample_num != -1:
+        df = df.sample(n=args.sample_num, random_state=0).sort_index()
     logger.info(f"Loaded {len(df)} rows")
     llm = get_llm(args.model_path, beam_width=args.beam_width)
     
@@ -116,6 +118,7 @@ if __name__ == "__main__":
     df["messages"] = df["messages"].apply(lambda x: x[:-1] + [{"role": "assistant", "content": prompt_prefix}])
     if args.mode == "title":
         outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=args.beam_width, max_tokens=32)
+        # outputs = batch_chat(llm, df["messages"].tolist())
     else:
         outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=args.beam_width, max_tokens=4)
     logger.info(f"Batch chatting done")
@@ -123,4 +126,4 @@ if __name__ == "__main__":
     df["output"] = outputs
     df.drop(columns=["messages", "history"], inplace=True)
     logger.info(f"Saving to {output_path}")
-    df.reset_index().to_json(output_path, lines=True)
+    df.reset_index().to_json(output_path, lines=True, orient="records")
