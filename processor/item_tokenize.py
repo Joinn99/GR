@@ -273,9 +273,9 @@ if __name__ == "__main__":
     # labels_layers = model.fit_predict(embeddings)
 
     # index = pd.DataFrame(torch.stack(labels_layers, dim=0).to("cpu").numpy().transpose(1, 0))
-
+    import torch
     from vector_quantize_pytorch import ResidualVQ
-
+    torch.random.manual_seed(0)
     residual_vq = ResidualVQ(
         dim = 4096,
         num_quantizers = 3,      # specify number of quantizers
