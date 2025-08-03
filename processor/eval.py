@@ -4,12 +4,25 @@ import numpy as np
 from datetime import datetime, timezone, timedelta
 from logger import get_logger, log_with_color
 
+def get_pop_coeff(domain, threshold="2023-01-01", half_life=90, gamma=0.1):
+    threshold = datetime.strptime(threshold, "%Y-%m-%d")
+    inters = pd.read_csv(f"data/dataset/amazon_{domain}.csv.gz").drop(columns=["user_id"])
+    inters["timestamp"] = pd.to_datetime(inters["timestamp"], unit="ms")
+    inters["timediff"] = threshold - inters["timestamp"]
+    inters = inters[inters["timediff"] > timedelta(days=0)]
+    inters["timediff"]  = inters["timediff"] .apply(lambda x: x.days)
+
+    inters["coeff"] = inters["timediff"].apply(lambda x: np.exp(-(x) * (np.log(2) / half_life)))
+    item_coeff = inters.groupby("item_id")["coeff"].sum()
+    item_coeff = item_coeff.apply(lambda x: np.power(1 + x, gamma))
+    return item_coeff
+
 def map_history_id(eval_data, item_set):
     item_set_ids = item_set.reset_index().set_index("item_id")
     history_ids = eval_data["history"].apply(lambda x: item_set_ids.loc[x, "index"].tolist())
     return history_ids
 
-def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5):
+def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, metric="l2", rescale=False):
     item_set_path = f"data/information/amazon_{domain}.csv.gz"
     eval_data_path = f"data/messages/amazon_{domain}_test.jsonl.gz"
     item_embeddings_path = f"data/embedding/amazon_{domain}.npy"
@@ -49,13 +62,25 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5):
 
             # Calculate distance between batch_eval_embeddings and item_embeddings
             distance = torch.matmul(batch_eval_embeddings, item_embeddings.T)   # [batch_size, N, I]
-            cosine_similarity = distance / torch.norm(batch_eval_embeddings, dim=-1, keepdim=True)
-            cosine_similarity = cosine_similarity / torch.norm(item_embeddings.unsqueeze(0), dim=-1, keepdim=True).transpose(1, 2)
-            cosine_similarity = torch.max(cosine_similarity, dim=1).values
-
-            # Assign -inf to the distance between eval and its history
-            cosine_similarity[tuple(history_ids.T)] = float('-inf')
-            item_rankings = torch.topk(cosine_similarity, k=max(top_k), dim=1, largest=True).indices
+            if metric == "cosine":
+                cosine_similarity = distance / torch.norm(batch_eval_embeddings, dim=-1, keepdim=True)
+                cosine_similarity = cosine_similarity / torch.norm(item_embeddings.unsqueeze(0), dim=-1, keepdim=True).transpose(1, 2)
+                cosine_similarity = torch.max(cosine_similarity, dim=1).values
+                cosine_similarity[tuple(history_ids.T)] = float('-inf')
+                item_rankings = torch.topk(cosine_similarity, k=max(top_k), dim=1, largest=True).indices
+            else:
+                distance = torch.norm(batch_eval_embeddings, dim=-1, keepdim=True) + \
+                            torch.norm(item_embeddings.unsqueeze(0), dim=-1, keepdim=True).transpose(1, 2) - \
+                                2 * distance
+                distance = torch.min(distance, dim=1).values
+                distance[tuple(history_ids.T)] = float('inf')
+                if rescale:
+                    item_coeff = get_pop_coeff(domain, threshold="2023-01-01", half_life=90, gamma=0.1)
+                    item_coeff = torch.from_numpy(item_coeff.to_numpy()).unsqueeze(0).unsqueeze(0)
+                    distance = distance * item_coeff
+                else:
+                    item_coeff = 1.
+                item_rankings = torch.topk(distance * item_coeff, k=max(top_k), dim=1, largest=False).indices
 
             # Get the closest item for each eva
             for i in range(item_rankings.shape[0]):
@@ -156,10 +181,12 @@ if __name__ == "__main__":
             metrics = title_eval(domain, args.split, embed_model, top_k=args.top_k, beam_size=args.beam_size)
             all_metrics.extend(metrics)
 
+    output_df = pd.DataFrame(all_metrics)
     output_path = f"data/archive/amazon.csv"
     if not os.path.exists(output_path):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    output_df = pd.DataFrame(all_metrics)
-    output_df.to_csv(output_path, index=False, mode="a")
+        output_df.to_csv(output_path, index=False, mode="w")
+    else:
+        output_df.to_csv(output_path, index=False, header=False, mode="a")
     log_with_color(logger, "INFO", f"Saved results to {output_path}", "cyan")
     log_with_color(logger, "INFO", f"Evaluation completed", "magenta")
