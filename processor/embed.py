@@ -3,50 +3,10 @@ import argparse
 import pandas as pd
 import torch
 import numpy as np
-import logging
-
-# Custom colored formatter
-class ColoredFormatter(logging.Formatter):
-    """Custom formatter with colored output."""
-    
-    # ANSI color codes
-    COLORS = {
-        'DEBUG': '\033[36m',    # Cyan
-        'INFO': '\033[32m',     # Green
-        'WARNING': '\033[33m',  # Yellow
-        'ERROR': '\033[31m',    # Red
-        'CRITICAL': '\033[35m', # Magenta
-        'RESET': '\033[0m'      # Reset
-    }
-    
-    def format(self, record):
-        # Get the original format
-        log_message = super().format(record)
-        
-        # Add color based on log level
-        level_name = record.levelname
-        if level_name in self.COLORS:
-            log_message = f"{self.COLORS[level_name]}{log_message}{self.COLORS['RESET']}"
-        
-        return log_message
+from logger import get_logger, log_with_color
 
 # Configure logging with colors
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# Create console handler with colored formatter
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-
-# Create colored formatter
-colored_formatter = ColoredFormatter(
-    fmt='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-console_handler.setFormatter(colored_formatter)
-
-# Add handler to logger
-logger.addHandler(console_handler)
+logger = get_logger(__name__)
 
 
 def parse_arguments():
@@ -149,7 +109,7 @@ def generate_embeddings(model, data, with_description=True):
 def save_embeddings(embeddings, output_path):
     """Save embeddings to file."""
     np.save(output_path, embeddings.cpu().numpy())
-    logger.info(f"Embeddings saved to {output_path}")
+    log_with_color(logger, "INFO", f"Embeddings saved to {output_path}")
 
 
 def main():
@@ -158,8 +118,9 @@ def main():
     
     input_csv = f"data/information/amazon_{args.domain}.csv.gz"
     output_file = f"data/embedding/amazon_{args.domain}.npy"
+    log_with_color(logger, "INFO", f"Generating embeddings for items in {args.domain}", "magenta")
 
-    logger.info(f"Loading model from: {args.model_path}")
+    log_with_color(logger, "INFO", f"Loading model from: {args.model_path}", "cyan")
     model = initialize_model(
         args.model_path, 
         args.gpu_id, 
@@ -167,16 +128,17 @@ def main():
         args.max_model_len
     )
     
-    logger.info(f"Loading data from: {input_csv}")
+    log_with_color(logger, "INFO", f"Loading data from: {input_csv}", "cyan")
     data = pd.read_csv(input_csv)
-    
-    logger.info(f"Generating embeddings for {len(data)} items...")
+    log_with_color(logger, "INFO", f"Loaded {len(data)} items", "red")
+
+    log_with_color(logger, "INFO", f"Generating embeddings for {len(data)} items...", "magenta")
     embeddings = generate_embeddings(model, data, with_description=True)
     
-    logger.info(f"Saving embeddings to: {output_file}")
+    log_with_color(logger, "INFO", f"Saving embeddings to: {output_file}", "cyan")
     save_embeddings(embeddings, output_file)
     
-    logger.info("Embedding generation completed successfully!")
+    log_with_color(logger, "INFO", "Embedding generation completed successfully!", "magenta")
 
 
 if __name__ == "__main__":

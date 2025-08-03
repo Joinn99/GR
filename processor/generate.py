@@ -1,15 +1,14 @@
 import argparse
 import pandas as pd
 import numpy as np
-import logging
+
 from tqdm import tqdm
+from logger import get_logger, log_with_color
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+tqdm.pandas()
 
-logger = logging.getLogger(__name__)
+# Configure logging with colors
+logger = get_logger(__name__)
 
 def get_llm(
     model_path,
@@ -76,10 +75,6 @@ def batch_beam_search(
             params=sampling_params,
         )
         outputs.extend(batch_outputs)
-    # outputs = llm.beam_search(
-    #     prompts=prompts,
-    #     params=sampling_params,
-    # )
     result_rankings = [
         [tokenizer.decode(s.tokens[-max_tokens:]) for s in output.sequences]
         for output in outputs
@@ -99,6 +94,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     np.random.seed(0)
+    log_with_color(logger, "INFO", f"Generating data for {args.domain} in {args.split} with {args.mode} mode", "magenta")
 
     if args.mode == "title":
         input_path = f"data/messages/amazon_{args.domain}_test.jsonl.gz"
@@ -107,25 +103,27 @@ if __name__ == "__main__":
 
     output_path = f"data/outputs/amazon_{args.domain}_{args.split}_{args.mode}.jsonl"
 
-    logger.info(f"Loading data from {input_path}")
+    log_with_color(logger, "INFO", f"Loading data from {input_path}", "cyan")
     df = pd.read_json(input_path, lines=True)
     if args.sample_num != -1:
         df = df.sample(n=args.sample_num, random_state=0).sort_index()
-    logger.info(f"Loaded {len(df)} rows")
+    log_with_color(logger, "INFO", f"Loaded {len(df)} rows", "red")
     llm = get_llm(args.model_path, beam_width=args.beam_width)
     
     prompt_prefix = "Recommended Item Title:" if args.mode == "title" else "Recommended Item Index: "
     
-    logger.info(f"Batch chatting...")
+    log_with_color(logger, "INFO", f"Batch chatting...", "magenta")
     df["messages"] = df["messages"].apply(lambda x: x[:-1] + [{"role": "assistant", "content": prompt_prefix}])
     if args.mode == "title":
         outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=args.beam_width, max_tokens=32)
         # outputs = batch_chat(llm, df["messages"].tolist())
     else:
         outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=args.beam_width, max_tokens=4)
-    logger.info(f"Batch chatting done")
+    log_with_color(logger, "INFO", f"Batch chatting done", "magenta")
     
     df["output"] = outputs
     df.drop(columns=["messages", "history"], inplace=True)
-    logger.info(f"Saving to {output_path}")
+    log_with_color(logger, "INFO", f"Saving to {output_path}", "cyan")
     df.reset_index().to_json(output_path, lines=True, orient="records")
+    
+    log_with_color(logger, "INFO", f"Generation completed", "magenta")

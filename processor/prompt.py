@@ -1,5 +1,4 @@
 
-
 prompt_template = """You are a recommendation system. Based on the user's purchase/interaction history shown below (arranged chronologically from oldest to newest), predict a new {index} of the item that the user is most likely to interact with next.
 
 User's historical interactive items:

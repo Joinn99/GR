@@ -2,57 +2,16 @@ import os
 import random
 import argparse
 import pandas as pd
-import logging
 from tqdm import tqdm
 
 from utils import time_split_data
-
 from prompt import prompt_template, item_template, prediction_template
+from logger import get_logger, log_with_color
 
 tqdm.pandas()
 
-# Custom colored formatter
-class ColoredFormatter(logging.Formatter):
-    """Custom formatter with colored output."""
-    
-    # ANSI color codes
-    COLORS = {
-        'DEBUG': '\033[36m',    # Cyan
-        'INFO': '\033[32m',     # Green
-        'WARNING': '\033[33m',  # Yellow
-        'ERROR': '\033[31m',    # Red
-        'CRITICAL': '\033[35m', # Magenta
-        'RESET': '\033[0m'      # Reset
-    }
-    
-    def format(self, record):
-        # Get the original format
-        log_message = super().format(record)
-        
-        # Add color based on log level
-        level_name = record.levelname
-        if level_name in self.COLORS:
-            log_message = f"{self.COLORS[level_name]}{log_message}{self.COLORS['RESET']}"
-        
-        return log_message
-
 # Configure logging with colors
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# Create console handler with colored formatter
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-
-# Create colored formatter
-colored_formatter = ColoredFormatter(
-    fmt='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-console_handler.setFormatter(colored_formatter)
-
-# Add handler to logger
-logger.addHandler(console_handler)
+logger = get_logger(__name__)
 
 
 def parse_arguments():
@@ -108,11 +67,11 @@ def parse_arguments():
 
 def load_data(domain):
     """Load and preprocess the dataset."""
-    logger.info(f"Loading dataset for domain: {domain}")
+    log_with_color(logger, "INFO", f"Loading dataset for domain: {domain}", "magenta")
     
     # Load interaction data
     interaction_file = f"data/dataset/amazon_{domain}.csv.gz"
-    logger.info(f"Loading interaction data from: {interaction_file}")
+    log_with_color(logger, "INFO", f"Loading interaction data from: {interaction_file}", "cyan")
     df = pd.read_csv(interaction_file)
     
     # Convert timestamp and sort
@@ -121,7 +80,7 @@ def load_data(domain):
     
     # Load item information
     item_file = f"data/information/amazon_{domain}.csv.gz"
-    logger.info(f"Loading item information from: {item_file}")
+    log_with_color(logger, "INFO", f"Loading item information from: {item_file}", "cyan")
     item = pd.read_csv(item_file)
 
     sem_id_file = f"data/tokens/amazon_{domain}_index.jsonl"
@@ -212,19 +171,20 @@ def save_data(data, domain, phase, index, mode="w"):
         # Convert to DataFrame and save as JSON
     data.to_json(output_file, orient="records", lines=True, compression="gzip", mode=mode)
 
-    logger.info(f"Data saved to: {output_file}, {data.shape[0]} data points")
+    log_with_color(logger, "INFO", f"Data saved to: {output_file}, {data.shape[0]} data points", "cyan")
 
 
 def main():
     """Main function to orchestrate the data generation process."""
     args = parse_arguments()
     
-    logger.info(f"Starting data generation for domain: {args.domain}")
+    log_with_color(logger, "INFO", f"Starting data generation for domain: {args.domain}", "magenta")
     
     # Load data
     df, item = load_data(args.domain)
     random.seed(0)
     # Generate training data
+    log_with_color(logger, "INFO", f"Generating training data for {args.domain}", "magenta")
     output_data = df.progress_apply(
         lambda x: assemble_user_data(
             x["item_id"], x["timestamp"], item,
@@ -239,7 +199,7 @@ def main():
         columns=["messages", "timestamp", "item_id", "history", "aux"],
         index=output_data.index
     )
-
+    
     data_split = time_split_data(output_data)
     for phase, df_phase in data_split.items():
         if phase == "test":
@@ -252,7 +212,7 @@ def main():
         df_phase = df_phase.reset_index().drop(columns=["aux"])
         save_data(df_phase.sort_values(by="timestamp"), args.domain, phase, args.index)
     
-    logger.info("Data generation completed successfully!")
+    log_with_color(logger, "INFO", "Data generation completed successfully!", "magenta")
 
 
 if __name__ == "__main__":

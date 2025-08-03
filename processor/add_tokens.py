@@ -1,4 +1,7 @@
 import json
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 def add_token(level=4, codebook_size=256, start_id=151669):
     added_tokens = []
@@ -62,9 +65,11 @@ if __name__ == "__main__":
     parser.add_argument("--vocab_size", type=int, default=152704)
     args = parser.parse_args()
     # add_token_to_tokenizer(args.tokenizer_path)
+    logger.info(f"Modifying checkpoint for domain: {args.domain}, split: {args.split}, epoch: {args.epoch}")
     modify_checkpoint(
         base_model_path=args.base_model_path,
         checkpoint_path=f"{args.checkpoint_dir}/{args.domain}-{args.split}-sem_id/epoch_{args.epoch}",
         start_id=args.start_id,
         vocab_size=args.vocab_size
     )
+    logger.info(f"Checkpoint modification completed successfully")

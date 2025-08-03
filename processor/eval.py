@@ -1,8 +1,8 @@
 import torch
 import pandas as pd
 import numpy as np
-import logging
 from datetime import datetime, timezone, timedelta
+from logger import get_logger
 
 def map_history_id(eval_data, item_set):
     item_set_ids = item_set.reset_index().set_index("item_id")
@@ -127,8 +127,8 @@ if __name__ == "__main__":
     parser.add_argument("--embed_model_path", type=str, default=f"{DATA_PATH}/zoo/Qwen3-Embedding-8B")
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO)
-    logging.info(f"Evaluating {args.mode} for {', '.join(args.domain)} on {', '.join(args.split)} with top_k={', '.join(map(str, args.top_k))} and beam_size={args.beam_size}")
+    logger = get_logger(__name__)
+    logger.info(f"Evaluating {args.mode} for {', '.join(args.domain)} on {', '.join(args.split)} with top_k={', '.join(map(str, args.top_k))} and beam_size={args.beam_size}")
 
     if args.mode == "title":
         from embed import initialize_model
@@ -142,11 +142,11 @@ if __name__ == "__main__":
     all_metrics = []
     for domain in args.domain:
         if args.mode == "sem_id":
-            logging.info(f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}")
+            logger.info(f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}")
             metrics = sem_id_eval(domain, args.split, top_k=args.top_k)
             all_metrics.extend(metrics)
         elif args.mode == "title":
-            logging.info(f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}")
+            logger.info(f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}")
             metrics = title_eval(domain, args.split, embed_model, top_k=args.top_k, beam_size=args.beam_size)
             all_metrics.extend(metrics)
 
@@ -154,4 +154,4 @@ if __name__ == "__main__":
 
     output_df = pd.DataFrame(all_metrics)
     output_df.to_csv(output_path, index=False, mode="a")
-    logging.info(f"Saved results to {output_path}")
+    logger.info(f"Saved results to {output_path}")

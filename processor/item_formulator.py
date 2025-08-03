@@ -2,8 +2,10 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from prompt import index_template, i2t_prompt, t2i_prompt, text_template
+from logger import get_logger, log_with_color
 
 np.random.seed(0)
+logger = get_logger(__name__)
 
 def formulate_t2i_messages(target_rows: pd.DataFrame, example_rows: pd.DataFrame):
     examples = [
@@ -88,12 +90,18 @@ if __name__ == "__main__":
     sem_id_file_path = f"data/tokens/amazon_{args.domain}_index.jsonl"
     output_file_path = f"data/sequences/amazon_{args.domain}_items.jsonl.gz"
 
+    log_with_color(logger, "INFO", f"Loading item data from: {item_file_path}", "cyan")
     item = pd.read_csv(item_file_path)
+    log_with_color(logger, "INFO", f"Loading semantic ID data from: {sem_id_file_path}", "cyan")
     sem_id = pd.read_json(sem_id_file_path, convert_dates=False, date_unit="s", lines=True)
 
     item["sem_id"] = sem_id["sem_id"]
     item = item.fillna("")
+    log_with_color(logger, "INFO", f"Constructing dataset with {len(item)} items and group size: {args.item_group_num}", "red")
 
     dataset = pd.DataFrame(construct_dataset(item, args.item_group_num)).sample(frac=1)
+    log_with_color(logger, "INFO", f"Dataset constructed with {len(dataset)} samples", "red")
 
+    log_with_color(logger, "INFO", f"Saving dataset to: {output_file_path}", "cyan")
     dataset.to_json(output_file_path, orient="records", lines=True)
+    log_with_color(logger, "INFO", "Dataset construction completed successfully", "magenta")

@@ -15,91 +15,12 @@
 
 import pandas as pd
 import argparse
-import logging
 import os
 from tqdm import tqdm
 from typing import Optional
+from logger import get_logger, log_with_color, setup_logger
 
 tqdm.pandas()
-
-class ColoredFormatter(logging.Formatter):
-    """Custom formatter that adds colors to log messages."""
-    
-    # ANSI color codes
-    COLORS = {
-        'DEBUG': '\033[36m',      # Cyan
-        'INFO': '\033[32m',       # Green
-        'WARNING': '\033[33m',    # Yellow
-        'ERROR': '\033[31m',      # Red
-        'CRITICAL': '\033[35m',   # Magenta
-        'RESET': '\033[0m'        # Reset
-    }
-    
-    def format(self, record):
-        # Get the original formatted message
-        formatted = super().format(record)
-        
-        # Add color based on log level
-        color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
-        reset = self.COLORS['RESET']
-        
-        return f"{color}{formatted}{reset}"
-
-
-def setup_logging(log_level: str = "INFO") -> None:
-    """Setup logging configuration with colored output.
-    
-    Args:
-        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    """
-    # Create logger
-    logger = logging.getLogger()
-    logger.setLevel(getattr(logging, log_level.upper()))
-    
-    # Remove existing handlers
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-    
-    # Create console handler with colored formatter
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(getattr(logging, log_level.upper()))
-    
-    # Create colored formatter
-    formatter = ColoredFormatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    console_handler.setFormatter(formatter)
-    
-    # Add handler to logger
-    logger.addHandler(console_handler)
-
-
-def log_with_color(logger, level: str, message: str, color: Optional[str] = None) -> None:
-    """Log a message with optional custom color.
-    
-    Args:
-        logger: Logger instance
-        level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        message: Message to log
-        color: Optional custom color (red, green, blue, yellow, magenta, cyan)
-    """
-    # Custom color mapping
-    custom_colors = {
-        'red': '\033[31m',
-        'green': '\033[32m',
-        'blue': '\033[34m',
-        'yellow': '\033[33m',
-        'magenta': '\033[35m',
-        'cyan': '\033[36m',
-        'reset': '\033[0m'
-    }
-    
-    if color and color in custom_colors:
-        colored_message = f"{custom_colors[color]}{message}{custom_colors['reset']}"
-        getattr(logger, level.lower())(colored_message)
-    else:
-        getattr(logger, level.lower())(message)
 
 
 def preprocess_item(item_path: str) -> pd.DataFrame:
@@ -111,7 +32,7 @@ def preprocess_item(item_path: str) -> pd.DataFrame:
     Returns:
         DataFrame with processed item information
     """
-    logger = logging.getLogger(__name__)
+    logger = get_logger(__name__)
     log_with_color(logger, "INFO", f"Processing item metadata from: {item_path}", "cyan")
     
     df_chunks = pd.read_json(item_path, lines=True, chunksize=1000)
@@ -153,7 +74,7 @@ def preprocess_interaction(
         min_interactions: Minimum number of interactions required for users/items
         min_date: Minimum date filter for interactions
     """
-    logger = logging.getLogger(__name__)
+    logger = get_logger(__name__)
     log_with_color(logger, "INFO", f"Starting preprocessing for {prefix}", "magenta")
     
     # Read interaction data
@@ -323,8 +244,7 @@ def main():
     args = parser.parse_args()
     
     # Setup logging
-    setup_logging(args.log_level)
-    logger = logging.getLogger(__name__)
+    logger = get_logger(__name__)
     
     log_with_color(logger, "INFO", "Starting Amazon data preprocessing", "magenta")
     log_with_color(logger, "INFO", f"Arguments: {vars(args)}", "blue")
@@ -348,10 +268,10 @@ def main():
             tokenizer_path=args.tokenizer_path
         )
         
-        log_with_color(logger, "INFO", "Preprocessing completed successfully", "green")
+        log_with_color(logger, "INFO", "Preprocessing completed successfully", "magenta")
         
     except Exception as e:
-        logger.error(f"Preprocessing failed: {e}")
+        log_with_color(logger, "ERROR", f"Preprocessing failed: {e}", "red")
         raise
 
 

@@ -42,7 +42,7 @@ for CUR_DOMAIN in ${DOMAINS[@]}; do
             --base_model_path ${ZOO_PATH}/Qwen3-0.6B
         fi
 
-        CUDA_VISIBLE_DEVICES=${GPU_ID} python evaluation/generate.py \
+        CUDA_VISIBLE_DEVICES=${GPU_ID} python processor/generate.py \
             --model_path ${CHECKPOINT_PATH} \
             --mode ${MODE} \
             --split ${SPLIT} \
