@@ -87,8 +87,10 @@ def batch_beam_search(
     return result_rankings
 
 if __name__ == "__main__":
+    import os
+    DATA_PATH = os.getenv("DATA_PATH")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", type=str, default="/home/Data/zoo/Qwen3-0.6B")
+    parser.add_argument("--model_path", type=str, default=f"{DATA_PATH}/zoo/Qwen3-0.6B")
     parser.add_argument("--mode", type=str, default="title")
     parser.add_argument("--split", type=str, default="phase1")
     parser.add_argument("--domain", type=str, default="Cell_Phones_and_Accessories")

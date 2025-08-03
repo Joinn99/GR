@@ -1,15 +1,17 @@
 DOMAINS=(
     # "Movies_and_TV"
-    # "Books"
-    "Video_Games"
+    "Books"
+    # "Video_Games"
     # "Cell_Phones_and_Accessories"
     # "Sports_and_Outdoors"
 )
 
-export CHECKPOINT_DIR="/home/Data/Common/GenRec"
-export DOMAIN=${DOMAINS[0]}
-export MODE="title"
-export ZOO_PATH="/home/Data/zoo"
+GPU_ID="3"
+
+export MODE="sem_id"
+export ZOO_PATH=${zoo}
+export DATA_PATH=${data}
+export CHECKPOINT_DIR="${data}/Common/GenRec"
 
 if [ ${MODE} == "sem_id" ]; then
     export BEAM_WIDTH=50
@@ -17,33 +19,43 @@ else
     export BEAM_WIDTH=5
 fi
 
-for SPLIT_ID in "pretrain" "phase1" "phase2"; do
-    export SPLIT=${SPLIT_ID}
+for CUR_DOMAIN in ${DOMAINS[@]}; do
+    export DOMAIN=${CUR_DOMAIN}
+    for SPLIT_ID in "pretrain" "phase1" "phase2"; do
+        export SPLIT=${SPLIT_ID}
 
-    if [ ${SPLIT} == "pretrain" ]; then
-        export EPOCH=2
-    else
-        export EPOCH=1
-    fi
-    
+        if [ ${SPLIT} == "pretrain" ]; then
+            export EPOCH=2
+        else
+            export EPOCH=1
+        fi
+        
+        export CHECKPOINT_PATH="${CHECKPOINT_DIR}/${DOMAIN}-${SPLIT}-${MODE}/epoch_${EPOCH}"
+        # export CHECKPOINT_PATH="${ZOO_PATH}/Qwen3-0.6B"
 
-    export CHECKPOINT_PATH="${CHECKPOINT_DIR}/${DOMAIN}-${SPLIT}-${MODE}/epoch_${EPOCH}"
-    # export CHECKPOINT_PATH="${ZOO_PATH}/Qwen3-0.6B"
+        if [ ${MODE} == "sem_id" ]; then
+        python processor/add_tokens.py \
+            --checkpoint_dir ${CHECKPOINT_DIR} \
+            --domain ${DOMAIN} \
+            --split ${SPLIT} \
+            --epoch ${EPOCH} \
+            --base_model_path ${ZOO_PATH}/Qwen3-0.6B
+        fi
 
-    if [ ${MODE} == "sem_id" ]; then
-    python processor/add_tokens.py \
-        --checkpoint_dir ${CHECKPOINT_DIR} \
-        --domain ${DOMAIN} \
-        --split ${SPLIT} \
-        --epoch ${EPOCH} \
-        --base_model_path ${ZOO_PATH}/Qwen3-0.6B
-    fi
-
-    CUDA_VISIBLE_DEVICES=0 python evaluation/generate.py \
-        --model_path ${CHECKPOINT_PATH} \
-        --mode ${MODE} \
-        --split ${SPLIT} \
-        --domain ${DOMAIN} \
-        --beam_width ${BEAM_WIDTH} \
-        --sample_num 2000
+        CUDA_VISIBLE_DEVICES=${GPU_ID} python evaluation/generate.py \
+            --model_path ${CHECKPOINT_PATH} \
+            --mode ${MODE} \
+            --split ${SPLIT} \
+            --domain ${DOMAIN} \
+            --beam_width ${BEAM_WIDTH} \
+            --sample_num 2000
+    done
 done
+
+python processor/eval.py --mode sem_id \
+    --domain Video_Games Movies_and_TV Cell_Phones_and_Accessories Sports_and_Outdoors \
+    --split pretrain phase1 phase2 \
+    --beam_size 5 \
+    --top_k 10 20 50 \
+    --gpu_id 0 \
+    --embed_model_path ${ZOO_PATH}/Qwen3-Embedding-8B

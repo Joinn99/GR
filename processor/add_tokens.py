@@ -50,12 +50,14 @@ def modify_checkpoint(base_model_path, checkpoint_path, start_id=151669, vocab_s
 
 if __name__ == "__main__":
     import argparse
+    import os
+    DATA_PATH = os.getenv("DATA_PATH")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint_dir", type=str, default="/home/Data/Common/GenRec/")
+    parser.add_argument("--checkpoint_dir", type=str, default=f"{DATA_PATH}/Common/GenRec/")
     parser.add_argument("--domain", type=str, default="Video_Games")
     parser.add_argument("--split", type=str, default="pretrain")
     parser.add_argument("--epoch", type=int, default=2)
-    parser.add_argument("--base_model_path", type=str, default="/home/Data/zoo/Qwen3-0.6B")
+    parser.add_argument("--base_model_path", type=str, default=f"{DATA_PATH}/zoo/Qwen3-0.6B")
     parser.add_argument("--start_id", type=int, default=151669)
     parser.add_argument("--vocab_size", type=int, default=152704)
     args = parser.parse_args()
