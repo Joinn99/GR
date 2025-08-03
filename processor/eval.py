@@ -2,7 +2,7 @@ import torch
 import pandas as pd
 import numpy as np
 from datetime import datetime, timezone, timedelta
-from logger import get_logger
+from logger import get_logger, log_with_color
 
 def map_history_id(eval_data, item_set):
     item_set_ids = item_set.reset_index().set_index("item_id")
@@ -12,12 +12,14 @@ def map_history_id(eval_data, item_set):
 def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5):
     item_set_path = f"data/information/amazon_{domain}.csv.gz"
     eval_data_path = f"data/messages/amazon_{domain}_test.jsonl.gz"
-    item_embeddings_path = f"data/embeddings/amazon_{domain}.npy"
+    item_embeddings_path = f"data/embedding/amazon_{domain}.npy"
 
     # load result
     item_set = pd.read_csv(item_set_path)
     eval_data = pd.read_json(eval_data_path, lines=True)
+    log_with_color(logger, "INFO", f"Loaded {len(item_set)} items and {len(eval_data)} eval data", "cyan")
     item_embeddings = np.load(item_embeddings_path)
+    log_with_color(logger, "INFO", f"Loaded {item_embeddings.shape[0]} item embeddings", "cyan")
     item_embeddings = torch.from_numpy(item_embeddings)
 
     batch_size = 256
@@ -25,8 +27,9 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5):
     all_metrics = []
     from embed import generate_embeddings
     for split in splits:
+        log_with_color(logger, "INFO", f"Evaluating {split}...", "magenta")
         eval_set_path = f"data/outputs/amazon_{domain}_{split}_title.jsonl"
-        eval_set = pd.concat([eval_set, pd.read_json(eval_set_path, lines=True)])
+        eval_set = pd.read_json(eval_set_path, lines=True)
         eval_set["history_ids"] = map_history_id(eval_data, item_set)
 
         output_titles = eval_set["output"].explode().sort_index()
@@ -52,13 +55,14 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5):
 
             # Assign -inf to the distance between eval and its history
             cosine_similarity[tuple(history_ids.T)] = float('-inf')
-            item_rankings = torch.topk(cosine_similarity, k=top_k, dim=1, largest=True).indices
+            item_rankings = torch.topk(cosine_similarity, k=max(top_k), dim=1, largest=True).indices
 
             # Get the closest item for each eva
-            all_closest_items.append(item_set.iloc[item_rankings[i]]["item_id"].tolist())
+            for i in range(item_rankings.shape[0]):
+                all_closest_items.append(item_set.iloc[item_rankings[i]]["item_id"].tolist())
         eval_set["item_rankings"] = all_closest_items
 
-        metrics = calculate_metrics(eval_set, "item_rankings", "sem_id", top_k=top_k)
+        metrics = calculate_metrics(eval_set, "item_rankings", "item_id", top_k=top_k)
 
         metrics.update({
             "domain": domain, "split": split, "mode": "title", 
@@ -74,12 +78,14 @@ def sem_id_eval(domain, splits, top_k=[10, 20, 50]):
     # load result
     item = pd.read_csv(item_path)
     sem_id = pd.read_json(sem_id_path, lines=True)
+    log_with_color(logger, "INFO", f"Loaded {len(item)} items and {len(sem_id)} sem_ids", "cyan")
 
     item["sem_id"] = sem_id["sem_id"].apply(str.strip)
     item = item.set_index("item_id")
 
     all_metrics = []
     for split in splits:
+        log_with_color(logger, "INFO", f"Evaluating {split}...", "magenta")
         result_path = f"data/outputs/amazon_{domain}_{split}_sem_id.jsonl"
         result = pd.read_json(result_path, lines=True)
         result = result.join(item.loc[:, ["sem_id"]], on="item_id", how="left")
@@ -104,7 +110,7 @@ def calculate_metrics(result_df, item_rankngs_col, target_col, top_k=[10,20,50])
         ndcg = matching_k.apply(lambda x: np.sum(x / np.log2(np.arange(2, len(x) + 2)))).mean()
         recall = matching_k.apply(lambda x: np.sum(x)).mean()
         mrr = matching_k.apply(lambda x: np.sum(1 / (np.arange(1, len(x) + 1)) * x)).mean()
-        print(f"NDCG@{str(k)}: {round(ndcg, 6)}, Recall@{str(k)}: {round(recall, 6)}, MRR@{str(k)}: {round(mrr, 6)}")
+        log_with_color(logger, "INFO", f"NDCG@{str(k)}: {round(ndcg, 6)}, Recall@{str(k)}: {round(recall, 6)}, MRR@{str(k)}: {round(mrr, 6)}", "red")
         metrics[f"NDCG@{str(k)}"] = ndcg
         metrics[f"Recall@{str(k)}"] = recall
         metrics[f"MRR@{str(k)}"] = mrr
@@ -128,7 +134,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     logger = get_logger(__name__)
-    logger.info(f"Evaluating {args.mode} for {', '.join(args.domain)} on {', '.join(args.split)} with top_k={', '.join(map(str, args.top_k))} and beam_size={args.beam_size}")
+    log_with_color(logger, "INFO", f"Evaluating {args.mode} for {', '.join(args.domain)} on {', '.join(args.split)} with top_k={', '.join(map(str, args.top_k))} and beam_size={args.beam_size}", "blue")
 
     if args.mode == "title":
         from embed import initialize_model
@@ -142,16 +148,18 @@ if __name__ == "__main__":
     all_metrics = []
     for domain in args.domain:
         if args.mode == "sem_id":
-            logger.info(f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}")
+            log_with_color(logger, "INFO", f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}", "magenta")
             metrics = sem_id_eval(domain, args.split, top_k=args.top_k)
             all_metrics.extend(metrics)
         elif args.mode == "title":
-            logger.info(f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}")
+            log_with_color(logger, "INFO", f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}", "magenta")
             metrics = title_eval(domain, args.split, embed_model, top_k=args.top_k, beam_size=args.beam_size)
             all_metrics.extend(metrics)
 
     output_path = f"data/archive/amazon.csv"
-
+    if not os.path.exists(output_path):
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
     output_df = pd.DataFrame(all_metrics)
     output_df.to_csv(output_path, index=False, mode="a")
-    logger.info(f"Saved results to {output_path}")
+    log_with_color(logger, "INFO", f"Saved results to {output_path}", "cyan")
+    log_with_color(logger, "INFO", f"Evaluation completed", "magenta")
