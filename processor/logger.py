@@ -71,21 +71,23 @@ def setup_logger(
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, level.upper()))
     
-    # Remove existing handlers if force=True or if no handlers exist
-    if force or not logger.handlers:
-        for handler in logger.handlers[:]:
-            logger.removeHandler(handler)
-        
-        # Create console handler with colored formatter
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(getattr(logging, level.upper()))
-        
-        # Create colored formatter
-        formatter = ColoredFormatter(format_string, date_format)
-        console_handler.setFormatter(formatter)
-        
-        # Add handler to logger
-        logger.addHandler(console_handler)
+    # Always remove existing handlers to prevent duplicates
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    
+    # Create console handler with colored formatter
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(getattr(logging, level.upper()))
+    
+    # Create colored formatter
+    formatter = ColoredFormatter(format_string, date_format)
+    console_handler.setFormatter(formatter)
+    
+    # Add handler to logger
+    logger.addHandler(console_handler)
+    
+    # Prevent propagation to avoid duplicate messages
+    logger.propagate = False
     
     return logger
 
@@ -104,9 +106,8 @@ def get_logger(name: str = None) -> logging.Logger:
     
     logger = logging.getLogger(name)
     
-    # If logger has no handlers, set it up
-    if not logger.handlers:
-        logger = setup_logger(name)
+    # Always set up the logger to ensure consistent configuration
+    logger = setup_logger(name)
     
     return logger
 

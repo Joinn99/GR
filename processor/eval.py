@@ -76,11 +76,10 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, met
                 distance[tuple(history_ids.T)] = float('inf')
                 if rescale:
                     item_coeff = get_pop_coeff(domain, threshold="2023-01-01", half_life=90, gamma=0.1)
-                    item_coeff = torch.from_numpy(item_coeff.to_numpy()).unsqueeze(0).unsqueeze(0)
-                    distance = distance * item_coeff
+                    rescale_coeff = torch.from_numpy(item_set.join(item_coeff, on="item_id", how="left").fillna(0).loc[:, "coeff"].to_numpy()).unsqueeze(0)
                 else:
-                    item_coeff = 1.
-                item_rankings = torch.topk(distance * item_coeff, k=max(top_k), dim=1, largest=False).indices
+                    rescale_coeff = 1.
+                item_rankings = torch.topk(distance / rescale_coeff, k=max(top_k), dim=1, largest=False).indices
 
             # Get the closest item for each eva
             for i in range(item_rankings.shape[0]):
@@ -152,7 +151,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--domain", type=str, nargs='+', default=["Books"])
     parser.add_argument("--split", type=str, nargs='+', default=["pretrain", "phase1", "phase2"])
-    
+    parser.add_argument("--rescale", action="store_true")
     parser.add_argument("--top_k", type=int, nargs='+', default=[10, 20, 50])
     parser.add_argument("--gpu_id", type=str, default="0")
     parser.add_argument("--embed_model_path", type=str, default=f"{DATA_PATH}/zoo/Qwen3-Embedding-8B")
@@ -178,7 +177,7 @@ if __name__ == "__main__":
             all_metrics.extend(metrics)
         elif args.mode == "title":
             log_with_color(logger, "INFO", f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}", "magenta")
-            metrics = title_eval(domain, args.split, embed_model, top_k=args.top_k, beam_size=args.beam_size)
+            metrics = title_eval(domain, args.split, embed_model, top_k=args.top_k, beam_size=args.beam_size, rescale=args.rescale)
             all_metrics.extend(metrics)
 
     output_df = pd.DataFrame(all_metrics)
