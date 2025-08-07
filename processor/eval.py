@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime, timezone, timedelta
 from logger import get_logger, log_with_color
 
-def get_pop_coeff(domain, threshold="2023-01-01", half_life=90, gamma=0.1):
+def get_pop_coeff(domain, threshold="2023-01-01", half_life=90, gamma=0.2):
     threshold = datetime.strptime(threshold, "%Y-%m-%d")
     inters = pd.read_csv(f"data/dataset/amazon_{domain}.csv.gz").drop(columns=["user_id"])
     inters["timestamp"] = pd.to_datetime(inters["timestamp"], unit="ms")
