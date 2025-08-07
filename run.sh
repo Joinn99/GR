@@ -1,17 +1,19 @@
 
 DOMAINS=(
     # "Video_Games"
-    "Movies_and_TV"
+    # "Movies_and_TV"
     # "Cell_Phones_and_Accessories"
     # "Books"
-    "Sports_and_Outdoors"
+    # "Sports_and_Outdoors"
+    # "Health_and_Household"
+    "Software"
 )
 
 # CUR_DOMAIN=${DOMAINS[0]}
 GPU_ID="3"
 
 for CUR_DOMAIN in ${DOMAINS[@]}; do
-    for CUR_SPLIT in "phase1" "phase2"; do
+    for CUR_SPLIT in "pretrain" "phase1" "phase2"; do
         export DOMAIN=${CUR_DOMAIN}
         export SPLIT=${CUR_SPLIT}
         export ZOO_PATH=${zoo}

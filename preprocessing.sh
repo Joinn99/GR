@@ -4,7 +4,10 @@ DOMAINS=(
     # "Cell_Phones_and_Accessories"
     # "Books"
     # "Sports_and_Outdoors"
-    "Musical_Instruments"
+    # "Musical_Instruments"
+    # "Health_and_Household"
+    # "Office_Products"
+    "Software"
 )
 
 mkdir -p ${data}/dataset/Amazon
@@ -25,9 +28,10 @@ for DOMAIN in ${DOMAINS[@]}; do
         mv meta_${DOMAIN}.jsonl.gz ${INFORMATION_FILE_PATH} || true
     fi
 
-    # python processor/preprocess.py --file_path ${data}/dataset/Amazon --domain $DOMAIN --tokenizer_path ${zoo}/Qwen3-0.6B --min_date 2017-07-01
-    # python processor/embed.py --domain $DOMAIN  --model_path ${zoo}/Qwen3-Embedding-8B --gpu_id 0
+    python processor/preprocess.py --file_path ${data}/dataset/Amazon --domain $DOMAIN --tokenizer_path ${zoo}/Qwen3-0.6B --min_date 2017-07-01
+    python processor/embed.py --domain $DOMAIN  --model_path ${zoo}/Qwen3-Embedding-8B --gpu_id 0
     python processor/item_tokenize.py --domain $DOMAIN --gpu_id 0 --n_layers 3 --cluster_sizes 256 256 256
     python processor/formulator.py --domain $DOMAIN --index title
+    python processor/formulator.py --domain $DOMAIN --index sem_id
     python processor/item_formulator.py --domain $DOMAIN --item_group_num 5
 done

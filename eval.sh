@@ -1,9 +1,9 @@
 DOMAINS=(
-    # "Movies_and_TV"
+    "Movies_and_TV"
     "Books"
-    # "Video_Games"
-    # "Cell_Phones_and_Accessories"
-    # "Sports_and_Outdoors"
+    "Video_Games"
+    "Cell_Phones_and_Accessories"
+    "Sports_and_Outdoors"
 )
 
 GPU_ID="3"
@@ -52,10 +52,10 @@ for CUR_DOMAIN in ${DOMAINS[@]}; do
     done
 done
 
-python processor/eval.py --mode sem_id \
-    --domain Video_Games Movies_and_TV Cell_Phones_and_Accessories Sports_and_Outdoors \
+python processor/eval.py --mode title \
+    --domain Movies_and_TV Cell_Phones_and_Accessories Books Video_Games Sports_and_Outdoors \
     --split pretrain phase1 phase2 \
     --beam_size 5 \
-    --top_k 10 20 50 \
-    --gpu_id 0 \
-    --embed_model_path ${ZOO_PATH}/Qwen3-Embedding-8B
+    --gpu_id 3 \
+    --embed_model_path ${zoo}/Qwen3-Embedding-8B \
+    --rescale
