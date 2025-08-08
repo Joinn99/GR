@@ -75,7 +75,7 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, met
                 distance = torch.min(distance, dim=1).values
                 distance[tuple(history_ids.T)] = float('inf')
                 if rescale:
-                    item_coeff = get_pop_coeff(domain, threshold="2023-01-01", half_life=90, gamma=0.1)
+                    item_coeff = get_pop_coeff(domain, threshold="2023-01-01", half_life=90, gamma=0.2)
                     rescale_coeff = torch.from_numpy(item_set.join(item_coeff, on="item_id", how="left").fillna(0).loc[:, "coeff"].to_numpy()).unsqueeze(0)
                 else:
                     rescale_coeff = 1.
@@ -116,8 +116,8 @@ def sem_id_eval(domain, splits, top_k=[10, 20, 50]):
         metrics = calculate_metrics(result, "output", "sem_id", top_k=top_k)
 
         metrics.update({
-            "domain": domain, "split": split, "mode": "sem_id", 
-            "time": datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+            "time": datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S"),
+            "mode": "sem_id", "split": split, "domain": domain
         })
         all_metrics.append(metrics)
     return all_metrics
@@ -181,11 +181,14 @@ if __name__ == "__main__":
             all_metrics.extend(metrics)
 
     output_df = pd.DataFrame(all_metrics)
-    output_path = f"data/archive/amazon.csv"
+    output_path = f"data/archive/amazon.tsv"
+    
+    # Use utility function for consistent float formatting
+    from utils import save_csv_with_precision
+    
     if not os.path.exists(output_path):
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        output_df.to_csv(output_path, index=False, mode="w")
+        save_csv_with_precision(output_df, output_path, precision=6, index=False, mode="w")
     else:
-        output_df.to_csv(output_path, index=False, header=False, mode="a")
+        save_csv_with_precision(output_df, output_path, precision=6, index=False, header=False, mode="a")
     log_with_color(logger, "INFO", f"Saved results to {output_path}", "cyan")
     log_with_color(logger, "INFO", f"Evaluation completed", "magenta")

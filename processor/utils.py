@@ -1,4 +1,10 @@
+import pandas as pd
+import numpy as np
+from datetime import datetime, timezone, timedelta
+import os
+
 from logger import get_logger, log_with_color
+from typing import List
 
 logger = get_logger(__name__)
 
@@ -9,6 +15,7 @@ TIME_SPLIT = [
     (("2023-01-01", "2023-04-01"), "test"),
 ]
 
+
 def time_split_data(df, time_split=TIME_SPLIT):
     log_with_color(logger, "INFO", f"Splitting data with {len(df)} records into {len(time_split)} time periods", "red")
     results = {}
@@ -17,4 +24,53 @@ def time_split_data(df, time_split=TIME_SPLIT):
         results[phase] = df_time
         log_with_color(logger, "INFO", f"Phase {phase}: {len(df_time)} records ({start} to {end})", "red")
     return results
+
+def save_csv_with_precision(df, filepath, precision=3, **kwargs):
+    """
+    Save DataFrame to CSV with specified float precision.
     
+    Args:
+        df: pandas DataFrame to save
+        filepath: path to save the CSV file
+        precision: number of decimal places for float columns (default: 6)
+        **kwargs: additional arguments to pass to to_csv()
+    """
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    
+    # Format string for float precision
+    float_format = f'%.{precision}f'
+    
+    # Save with specified float format
+    df.to_csv(filepath, float_format=float_format, sep="\t", **kwargs)
+    
+    return filepath
+
+def format_float_columns(df, precision=6):
+    """
+    Format float columns in DataFrame to specified precision.
+    
+    Args:
+        df: pandas DataFrame
+        precision: number of decimal places (default: 6)
+    
+    Returns:
+        DataFrame with formatted float columns
+    """
+    df_formatted = df.copy()
+    
+    # Apply formatting to float columns
+    for col in df_formatted.select_dtypes(include=[np.floating]).columns:
+        df_formatted[col] = df_formatted[col].apply(lambda x: f'{x:.{precision}f}' if pd.notna(x) else x)
+    
+    return df_formatted
+
+def get_merged_name(mode: str, source_domain: str, target_domains: List[str], splits: List[str], method: str):
+    assert min(len(splits), len(target_domains)) == 1, "Split and target domains cannot be > 1 at the same time"
+    source_domain = source_domain[:3]
+    target_domains = [domain[:3] for domain in target_domains]
+
+    if len(splits) == 1:
+        return f"merged_{source_domain}_{''.join(target_domains)}-{splits[0]}-{mode}-{method[:4]}"
+    else:
+        return f"merged_{source_domain}_{''.join(splits)}-{mode}-{method[:4]}"

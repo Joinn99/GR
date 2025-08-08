@@ -6,9 +6,15 @@ DOMAINS=(
     "Sports_and_Outdoors"
 )
 
+SPLITS=(
+    "pretrain"
+    "phase1"
+    "phase2"
+)
+
 GPU_ID="3"
 
-export MODE="sem_id"
+export MODE="title"
 export ZOO_PATH=${zoo}
 export DATA_PATH=${data}
 export CHECKPOINT_DIR="${data}/Common/GenRec"
@@ -19,9 +25,12 @@ else
     export BEAM_WIDTH=5
 fi
 
+RECOMPUTE=false
+
+if [ ${RECOMPUTE} == true ]; then
 for CUR_DOMAIN in ${DOMAINS[@]}; do
     export DOMAIN=${CUR_DOMAIN}
-    for SPLIT_ID in "pretrain" "phase1" "phase2"; do
+    for SPLIT_ID in ${SPLITS[@]}; do
         export SPLIT=${SPLIT_ID}
 
         if [ ${SPLIT} == "pretrain" ]; then
@@ -31,7 +40,6 @@ for CUR_DOMAIN in ${DOMAINS[@]}; do
         fi
         
         export CHECKPOINT_PATH="${CHECKPOINT_DIR}/${DOMAIN}-${SPLIT}-${MODE}/epoch_${EPOCH}"
-        # export CHECKPOINT_PATH="${ZOO_PATH}/Qwen3-0.6B"
 
         if [ ${MODE} == "sem_id" ]; then
         python processor/add_tokens.py \
@@ -51,11 +59,12 @@ for CUR_DOMAIN in ${DOMAINS[@]}; do
             --sample_num 2000
     done
 done
+fi
 
-python processor/eval.py --mode title \
-    --domain Movies_and_TV Cell_Phones_and_Accessories Books Video_Games Sports_and_Outdoors \
-    --split pretrain phase1 phase2 \
-    --beam_size 5 \
-    --gpu_id 3 \
+python processor/eval.py --mode ${MODE} \
+    --domain $(echo ${DOMAINS[@]} | tr ' ' ' ') \
+    --split $(echo ${SPLITS[@]} | tr ' ' ' ') \
+    --beam_size ${BEAM_WIDTH} \
+    --gpu_id ${GPU_ID} \
     --embed_model_path ${zoo}/Qwen3-Embedding-8B \
     --rescale

@@ -91,6 +91,7 @@ if __name__ == "__main__":
     parser.add_argument("--domain", type=str, default="Cell_Phones_and_Accessories")
     parser.add_argument("--beam_width", type=int, default=20)
     parser.add_argument("--sample_num", type=int, default=2000)
+    parser.add_argument("--output_name", type=str, default=None)
     args = parser.parse_args()
 
     np.random.seed(0)
@@ -101,7 +102,10 @@ if __name__ == "__main__":
     else:
         input_path = f"data/sequences/amazon_{args.domain}_test.jsonl.gz"
 
-    output_path = f"data/outputs/amazon_{args.domain}_{args.split}_{args.mode}.jsonl"
+    if args.output_name:
+        output_path = f"data/outputs/amazon_{args.output_name}.jsonl"
+    else:
+        output_path = f"data/outputs/amazon_{args.domain}_{args.split}_{args.mode}.jsonl"
 
     log_with_color(logger, "INFO", f"Loading data from {input_path}", "cyan")
     df = pd.read_json(input_path, lines=True)
