@@ -155,7 +155,7 @@ class ModelMerger:
             return False
         
         # Step 2: Run generation
-        # self.run_generation(model_name)
+        self.run_generation(model_name)
 
         # Step 3: Cleanup (commented out in original script)
         self.cleanup_checkpoint(model_name)
