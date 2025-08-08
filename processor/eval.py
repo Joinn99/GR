@@ -4,6 +4,9 @@ import numpy as np
 from datetime import datetime, timezone, timedelta
 from logger import get_logger, log_with_color
 
+logger = get_logger(__name__)
+logger.propagate = False
+
 def get_pop_coeff(domain, threshold="2023-01-01", half_life=90, gamma=0.2):
     threshold = datetime.strptime(threshold, "%Y-%m-%d")
     inters = pd.read_csv(f"data/dataset/amazon_{domain}.csv.gz").drop(columns=["user_id"])
@@ -22,7 +25,7 @@ def map_history_id(eval_data, item_set):
     history_ids = eval_data["history"].apply(lambda x: item_set_ids.loc[x, "index"].tolist())
     return history_ids
 
-def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, metric="l2", rescale=False):
+def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, metric="l2", rescale=False, eval_names=None):
     item_set_path = f"data/information/amazon_{domain}.csv.gz"
     eval_data_path = f"data/messages/amazon_{domain}_test.jsonl.gz"
     item_embeddings_path = f"data/embedding/amazon_{domain}.npy"
@@ -39,9 +42,12 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, met
 
     all_metrics = []
     from embed import generate_embeddings
-    for split in splits:
-        log_with_color(logger, "INFO", f"Evaluating {split}...", "magenta")
-        eval_set_path = f"data/outputs/amazon_{domain}_{split}_title.jsonl"
+
+    if not eval_names:
+        eval_names = [(split, f"amazon_{domain}_{split}_title") for split in splits]
+    for eval_name in eval_names:
+        log_with_color(logger, "INFO", f"Evaluating {eval_name[1]}...", "magenta")
+        eval_set_path = f"data/outputs/{eval_name[1]}.jsonl"
         eval_set = pd.read_json(eval_set_path, lines=True)
         eval_set["history_ids"] = map_history_id(eval_data, item_set)
 
@@ -89,13 +95,13 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, met
         metrics = calculate_metrics(eval_set, "item_rankings", "item_id", top_k=top_k)
 
         metrics.update({
-            "domain": domain, "split": split, "mode": "title", 
-            "time": datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+            "time": datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S"),
+            "mode": "title",  "split": eval_name[0], "domain": domain, "name": eval_name[1]
         })
         all_metrics.append(metrics)
     return all_metrics
 
-def sem_id_eval(domain, splits, top_k=[10, 20, 50]):
+def sem_id_eval(domain, splits, top_k=[10, 20, 50], eval_names=None):
     item_path = f"data/information/amazon_{domain}.csv.gz"
     sem_id_path = f"data/tokens/amazon_{domain}_index.jsonl"
 
@@ -107,17 +113,20 @@ def sem_id_eval(domain, splits, top_k=[10, 20, 50]):
     item["sem_id"] = sem_id["sem_id"].apply(str.strip)
     item = item.set_index("item_id")
 
+    if not eval_names:
+        eval_names = [(split, f"{domain}_{split}_sem_id") for split in splits]
+
     all_metrics = []
-    for split in splits:
-        log_with_color(logger, "INFO", f"Evaluating {split}...", "magenta")
-        result_path = f"data/outputs/amazon_{domain}_{split}_sem_id.jsonl"
+    for eval_name in eval_names:
+        log_with_color(logger, "INFO", f"Evaluating {eval_name[1]}...", "magenta")
+        result_path = f"data/outputs/amazon_{eval_name[1]}.jsonl"
         result = pd.read_json(result_path, lines=True)
         result = result.join(item.loc[:, ["sem_id"]], on="item_id", how="left")
         metrics = calculate_metrics(result, "output", "sem_id", top_k=top_k)
 
         metrics.update({
             "time": datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S"),
-            "mode": "sem_id", "split": split, "domain": domain
+            "mode": "sem_id", "split": eval_name[0], "domain": domain, "name": eval_name[1]
         })
         all_metrics.append(metrics)
     return all_metrics
@@ -135,9 +144,9 @@ def calculate_metrics(result_df, item_rankngs_col, target_col, top_k=[10,20,50])
         recall = matching_k.apply(lambda x: np.sum(x)).mean()
         mrr = matching_k.apply(lambda x: np.sum(1 / (np.arange(1, len(x) + 1)) * x)).mean()
         log_with_color(logger, "INFO", f"NDCG@{str(k)}: {round(ndcg, 6)}, Recall@{str(k)}: {round(recall, 6)}, MRR@{str(k)}: {round(mrr, 6)}", "red")
-        metrics[f"NDCG@{str(k)}"] = ndcg
-        metrics[f"Recall@{str(k)}"] = recall
-        metrics[f"MRR@{str(k)}"] = mrr
+        metrics[f"NDCG@{str(k)}"] = ndcg * 100
+        metrics[f"Recall@{str(k)}"] = recall * 100
+        metrics[f"MRR@{str(k)}"] = mrr * 100
     return metrics
 
 if __name__ == "__main__":
@@ -157,7 +166,7 @@ if __name__ == "__main__":
     parser.add_argument("--embed_model_path", type=str, default=f"{DATA_PATH}/zoo/Qwen3-Embedding-8B")
     args = parser.parse_args()
 
-    logger = get_logger(__name__)
+    
     log_with_color(logger, "INFO", f"Evaluating {args.mode} for {', '.join(args.domain)} on {', '.join(args.split)} with top_k={', '.join(map(str, args.top_k))} and beam_size={args.beam_size}", "blue")
 
     if args.mode == "title":
@@ -187,8 +196,9 @@ if __name__ == "__main__":
     from utils import save_csv_with_precision
     
     if not os.path.exists(output_path):
-        save_csv_with_precision(output_df, output_path, precision=6, index=False, mode="w")
+        save_csv_with_precision(output_df, output_path, precision=3, index=False, mode="w")
     else:
-        save_csv_with_precision(output_df, output_path, precision=6, index=False, header=False, mode="a")
+        save_csv_with_precision(output_df, output_path, precision=3, index=False, header=False, mode="a")
+
     log_with_color(logger, "INFO", f"Saved results to {output_path}", "cyan")
     log_with_color(logger, "INFO", f"Evaluation completed", "magenta")
