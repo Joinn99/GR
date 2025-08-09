@@ -13,12 +13,12 @@ from typing import Optional
 sys.path.append("./processor")
 from processor.merge import merge_models
 from processor.generate import generate_data
-from processor.utils import save_csv_with_precision
+from processor.utils import save_csv_with_precision, get_merged_name
 
 # Fallback defaults
-MODES = ["sem_id"]
+MODES = ["title"]
 SPLITS = ["phase2"]
-SOURCE_DOMAIN = "Video_Games"
+SOURCE_DOMAIN = "Books"
 TARGET_DOMAINS = ["Books"]
 METHODS = ["task_arithmetic"]
 
@@ -58,7 +58,7 @@ def setup_argparse():
                        help="Beam width for generation (auto-set based on mode if not specified)")
     parser.add_argument("--sample_num", type=int, default=2000,
                        help="Number of samples to generate")
-    parser.add_argument("--gpu_id", type=str, default=0,
+    parser.add_argument("--gpu_id", type=str, default="0",
                        help="GPU ID to use")
     
     # Eval Path
@@ -69,6 +69,10 @@ def setup_argparse():
     # Control flags
     parser.add_argument("--skip_cleanup", action="store_true",
                        help="Skip cleanup of merged model checkpoint")
+    parser.add_argument("--skip_merging", action="store_true",
+                       help="Skip merging")
+    parser.add_argument("--skip_generation", action="store_true",
+                       help="Skip generation")
 
     
     return parser
@@ -90,20 +94,32 @@ class ModelMerger:
             self.beam_width = BEAM_WIDTHS.get(self.mode, 5)
         else:
             self.beam_width = args.beam_width
+        self.skip_merging = args.skip_merging
+        self.skip_generation = args.skip_generation
+        self.skip_cleanup = args.skip_cleanup
 
     
     def run_merging(self) -> Optional[str]:
         """Run the merging script and capture model name from output"""
         print("Running merging script...")
-        return merge_models(
-            mode=self.mode,
-            source_domain=self.source_domain,
-            target_domains=self.target_domains,
-            splits=self.splits,
-            method=self.method,
-            base_model_path=args.base_model_path,
-            hllm_class_path=args.hllm_class_path
-        )
+        if not self.skip_merging:
+            return merge_models(
+                mode=self.mode,
+                source_domain=self.source_domain,
+                target_domains=self.target_domains,
+                splits=self.splits,
+                method=self.method,
+                base_model_path=args.base_model_path,
+                hllm_class_path=args.hllm_class_path
+            )
+        else:
+            return get_merged_name(
+                self.mode,
+                self.source_domain,
+                self.target_domains,
+                self.splits,
+                self.method
+            )
     
     def run_generation(self, model_name: str):
         """Run the generation script"""
@@ -155,10 +171,12 @@ class ModelMerger:
             return False
         
         # Step 2: Run generation
-        self.run_generation(model_name)
+        if not args.skip_generation:
+            self.run_generation(model_name)
 
         # Step 3: Cleanup (commented out in original script)
-        self.cleanup_checkpoint(model_name)
+        if not args.skip_cleanup:
+            self.cleanup_checkpoint(model_name)
         
         print("Process completed successfully")
         return model_name
@@ -169,12 +187,20 @@ if __name__ == "__main__":
     parser = setup_argparse()
     args = parser.parse_args()
     all_eval_names = []
-    for target in [["Books"]]:
+
+    args.skip_merging = True
+    args.skip_generation = True
+    args.skip_cleanup = True
+
+    for target in [["Video_Games"], ["Movies_and_TV"], ["Cell_Phones_and_Accessories"], ["Sports_and_Outdoors"]]:
         args.target_domains = target
-        merger = ModelMerger(args)
-        name = merger.run()
-        all_eval_names.append(("merged", name))
+        for method in ["average_merging", "ties_merging", "mask_merging", "task_arithmetic"]:
+            args.method = method
+            merger = ModelMerger(args)
+            name = merger.run()
+            all_eval_names.append(("merged", name))
     
+
     if args.mode == "title":
         from processor.embed import initialize_model
         embed_model = initialize_model(
