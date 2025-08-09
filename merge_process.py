@@ -16,7 +16,7 @@ from processor.generate import generate_data
 from processor.utils import save_csv_with_precision, get_merged_name
 
 # Fallback defaults
-MODES = ["title"]
+MODES = ["sem_id"]
 SPLITS = ["phase2"]
 SOURCE_DOMAIN = "Books"
 TARGET_DOMAINS = ["Books"]
@@ -192,13 +192,23 @@ if __name__ == "__main__":
     args.skip_generation = True
     args.skip_cleanup = True
 
-    for target in [["Video_Games"], ["Movies_and_TV"], ["Cell_Phones_and_Accessories"], ["Sports_and_Outdoors"]]:
-        args.target_domains = target
-        for method in ["average_merging", "ties_merging", "mask_merging", "task_arithmetic"]:
-            args.method = method
-            merger = ModelMerger(args)
-            name = merger.run()
-            all_eval_names.append(("merged", name))
+    eval_groups = {}
+    for source in ["Video_Games", "Movies_and_TV", "Cell_Phones_and_Accessories", "Sports_and_Outdoors"]:
+        args.source_domain = source
+        eval_groups[source] = []
+        for target in [["Video_Games"], ["Movies_and_TV"], ["Cell_Phones_and_Accessories"], ["Sports_and_Outdoors"], ["Books"]]:
+            args.target_domains = target
+            if source in target:
+                continue
+            for method in ["average_merging", "ties_merging", "mask_merging", "task_arithmetic"]:
+                args.method = method
+                merger = ModelMerger(args)
+                try:
+                    name = merger.run()
+                    eval_groups[source].append(("merged", name))
+                except Exception as e:
+                    print(f"Error during merging: {e}")
+                    continue
     
 
     if args.mode == "title":
@@ -212,10 +222,11 @@ if __name__ == "__main__":
 
     from processor.eval import title_eval, sem_id_eval
     output_path = f"data/archive/amazon.tsv"
-    
-    if args.mode == "title":
-        metrics = title_eval(args.source_domain, None, embed_model, beam_size=args.beam_width, rescale=args.rescale, eval_names=all_eval_names)
-    elif args.mode == "sem_id":
-        metrics = sem_id_eval(args.source_domain, None, eval_names=all_eval_names)
+
+    for source, eval_names in eval_groups.items():
+        if args.mode == "title":
+            metrics = title_eval(source, None, embed_model, beam_size=args.beam_width, rescale=args.rescale, eval_names=eval_names)
+        elif args.mode == "sem_id":
+            metrics = sem_id_eval(source, None, eval_names=eval_names)
         
-    save_csv_with_precision(pd.DataFrame(metrics), output_path, precision=3, index=False, header=False, mode="a")
+        save_csv_with_precision(pd.DataFrame(metrics), output_path, precision=3, index=False, header=False, mode="a")

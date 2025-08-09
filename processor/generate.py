@@ -67,7 +67,7 @@ def batch_beam_search(
             messages, add_generation_prompt=False, continue_final_message=True
         )
     ]
-    small_batch_size = 64
+    small_batch_size = 256
     outputs = []
     for i in tqdm(range(0, len(prompts), small_batch_size)):
         batch_prompts = prompts[i:i+small_batch_size]
