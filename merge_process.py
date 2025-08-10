@@ -16,10 +16,10 @@ from processor.generate import generate_data
 from processor.utils import save_csv_with_precision, get_merged_name
 
 # Fallback defaults
-MODES = ["sem_id"]
+MODES = ["hllm"]
 SPLITS = ["phase2"]
-SOURCE_DOMAIN = "Books"
-TARGET_DOMAINS = ["Books"]
+SOURCE_DOMAIN = "Video_Games"
+TARGET_DOMAINS = ["Sports_and_Outdoors"]
 METHODS = ["task_arithmetic"]
 
 # Default Settings
@@ -129,17 +129,49 @@ class ModelMerger:
         checkpoint_dir = f"{os.getenv('data', '')}/Common/GenRec"
         checkpoint_path = f"{checkpoint_dir}/{model_name}"
         
-        
-        # Build command arguments
-        generate_data(
-            model_path=checkpoint_path,
-            mode=self.mode,
-            split="merged",
-            domain=self.source_domain,
-            beam_width=self.beam_width,
-            sample_num=self.sample_num,
-            output_name=model_name
-        )
+        if self.mode == "hllm":
+            import subprocess
+            # Build the torchrun command
+            cmd = [
+                "torchrun",
+                f"--master_port={29501+int(self.gpu_id)}",
+                "--node_rank=0",
+                "--nproc_per_node=1",
+                "--nnodes=1",
+                "run.py",
+                "--config_file",
+                "overall/LLM_ddp_full.yaml",
+                "HLLM/HLLM-test.yaml"
+            ]
+            
+            # Set environment variable for CUDA_VISIBLE_DEVICES
+            env = os.environ.copy()
+            env["CUDA_VISIBLE_DEVICES"] = self.gpu_id
+            env["DOMAIN"] = self.source_domain
+            env["SPLIT"] = "merged"
+            env["EVAL_NAME"] = model_name
+            # Execute the command
+            try:
+                result = subprocess.run(cmd, env=env, check=True, capture_output=True, text=True, cwd=self.hllm_class_path)
+                print("HLLM torchrun command executed successfully")
+                print(result.stdout)
+            except subprocess.CalledProcessError as e:
+                print(f"Error executing HLLM torchrun command: {e}")
+                print(f"Return code: {e.returncode}")
+                print(f"Stdout: {e.stdout}")
+                print(f"Stderr: {e.stderr}")
+                raise
+        else:
+            # Build command arguments
+            generate_data(
+                model_path=checkpoint_path,
+                mode=self.mode,
+                split="merged",
+                domain=self.source_domain,
+                beam_width=self.beam_width,
+                sample_num=self.sample_num,
+                output_name=model_name
+            )
     
     def cleanup_checkpoint(self, model_name: str):
         """Clean up the merged model checkpoint directory"""
@@ -200,8 +232,12 @@ def merge_and_eval(args, eval_groups):
             metrics = title_eval(source, None, embed_model, beam_size=args.beam_width, rescale=args.rescale, eval_names=eval_names)
         elif args.mode == "sem_id":
             metrics = sem_id_eval(source, None, eval_names=eval_names)
-        
-        save_csv_with_precision(pd.DataFrame(metrics), output_path, precision=3, index=False, header=False, mode="a")
+        elif args.mode == "hllm":
+            metrics = None
+        else:
+            raise ValueError(f"Invalid mode: {args.mode}")
+        if metrics is not None:
+            save_csv_with_precision(pd.DataFrame(metrics), output_path, precision=3, index=False, header=False, mode="a")
 
 if __name__ == "__main__":
     """Main entry point"""
@@ -209,7 +245,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     all_eval_names = []
 
-    args.gpu_id = "1"
+    args.gpu_id = "0"
 
     # args.skip_merging = True
     # args.skip_generation = True
@@ -219,6 +255,6 @@ if __name__ == "__main__":
         args.beam_width = BEAM_WIDTHS.get(args.mode, 5)
 
     from test.test_loop import get_eval_groups
-    eval_groups = get_eval_groups("all_merging")(args, ModelMerger)
+    eval_groups = get_eval_groups("single_test_merging")(args, ModelMerger)
 
     merge_and_eval(args, eval_groups)

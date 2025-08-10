@@ -12,9 +12,9 @@ SPLITS=(
     "phase2"
 )
 
-GPU_ID="3"
+GPU_ID="1"
 
-export MODE="title"
+export MODE="sem_id"
 export ZOO_PATH=${zoo}
 export DATA_PATH=${data}
 export CHECKPOINT_DIR="${data}/Common/GenRec"
@@ -25,7 +25,7 @@ else
     export BEAM_WIDTH=5
 fi
 
-RECOMPUTE=false
+RECOMPUTE=true
 
 if [ ${RECOMPUTE} == true ]; then
 for CUR_DOMAIN in ${DOMAINS[@]}; do
@@ -40,6 +40,7 @@ for CUR_DOMAIN in ${DOMAINS[@]}; do
         fi
         
         export CHECKPOINT_PATH="${CHECKPOINT_DIR}/${DOMAIN}-${SPLIT}-${MODE}/epoch_${EPOCH}"
+        # export CHECKPOINT_PATH="${CHECKPOINT_DIR}/merged"
 
         if [ ${MODE} == "sem_id" ]; then
         python processor/add_tokens.py \
@@ -56,7 +57,7 @@ for CUR_DOMAIN in ${DOMAINS[@]}; do
             --split ${SPLIT} \
             --domain ${DOMAIN} \
             --beam_width ${BEAM_WIDTH} \
-            --sample_num 2000
+            --sample_num 10000
     done
 done
 fi

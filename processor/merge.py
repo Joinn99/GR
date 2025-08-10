@@ -10,7 +10,7 @@ from safetensors.torch import save_file
 
 from logger import get_logger, log_with_color
 from merging.merging_methods import MergingMethod
-from utils import get_merged_name
+from utils import get_merged_name, init_seed
 
 logger = get_logger(__name__)
 logger.propagate = False
@@ -132,6 +132,7 @@ def merge_models(mode, source_domain, target_domains, splits, method, base_model
     """
 
     log_with_color(logger, "INFO", "Starting model merging process", "magenta")
+    init_seed(0, reproducibility=True)
     
     # Get model paths
     output_name = get_merged_name(mode, source_domain, target_domains, splits, method)

@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timezone, timedelta
 import os
-
+import random
+import torch
 from logger import get_logger, log_with_color
 from typing import List
 
@@ -74,3 +75,24 @@ def get_merged_name(mode: str, source_domain: str, target_domains: List[str], sp
         return f"merged_{source_domain}_{''.join(target_domains)}-{splits[0]}-{mode}-{method[:4]}"
     else:
         return f"merged_{source_domain}_{''.join(splits)}-{mode}-{method[:4]}"
+
+
+def init_seed(seed, reproducibility):
+    r""" init random seed for random functions in numpy, torch, cuda and cudnn
+
+    Args:
+        seed (int): random seed
+        reproducibility (bool): Whether to require reproducibility
+    """
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    if reproducibility:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+    else:
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = False
