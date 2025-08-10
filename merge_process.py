@@ -182,35 +182,7 @@ class ModelMerger:
         return model_name
 
 
-if __name__ == "__main__":
-    """Main entry point"""
-    parser = setup_argparse()
-    args = parser.parse_args()
-    all_eval_names = []
-
-    args.skip_merging = True
-    args.skip_generation = True
-    args.skip_cleanup = True
-
-    eval_groups = {}
-    for source in ["Video_Games", "Movies_and_TV", "Cell_Phones_and_Accessories", "Sports_and_Outdoors"]:
-        args.source_domain = source
-        eval_groups[source] = []
-        for target in [["Video_Games"], ["Movies_and_TV"], ["Cell_Phones_and_Accessories"], ["Sports_and_Outdoors"], ["Books"]]:
-            args.target_domains = target
-            if source in target:
-                continue
-            for method in ["average_merging", "ties_merging", "mask_merging", "task_arithmetic"]:
-                args.method = method
-                merger = ModelMerger(args)
-                try:
-                    name = merger.run()
-                    eval_groups[source].append(("merged", name))
-                except Exception as e:
-                    print(f"Error during merging: {e}")
-                    continue
-    
-
+def merge_and_eval(args, eval_groups):
     if args.mode == "title":
         from processor.embed import initialize_model
         embed_model = initialize_model(
@@ -230,3 +202,23 @@ if __name__ == "__main__":
             metrics = sem_id_eval(source, None, eval_names=eval_names)
         
         save_csv_with_precision(pd.DataFrame(metrics), output_path, precision=3, index=False, header=False, mode="a")
+
+if __name__ == "__main__":
+    """Main entry point"""
+    parser = setup_argparse()
+    args = parser.parse_args()
+    all_eval_names = []
+
+    args.gpu_id = "1"
+
+    # args.skip_merging = True
+    # args.skip_generation = True
+    # args.skip_cleanup = True
+
+    if not args.beam_width:
+        args.beam_width = BEAM_WIDTHS.get(args.mode, 5)
+
+    from test.test_loop import get_eval_groups
+    eval_groups = get_eval_groups("all_merging")(args, ModelMerger)
+
+    merge_and_eval(args, eval_groups)
