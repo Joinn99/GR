@@ -163,7 +163,7 @@ def merge_models(mode, source_domain, target_domains, splits, method, base_model
     # Perform merging
     merged_model = MergingMethod(method).get_merged_model(
         merged_model=merged_model,
-        models_to_merge=models_to_merge + [merged_model],
+        models_to_merge=models_to_merge,
         exclude_param_names_regex=[]
     )
     
