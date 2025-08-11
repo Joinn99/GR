@@ -111,8 +111,9 @@ def generate_data(model_path, mode, split, domain, beam_width, sample_num, outpu
 
     log_with_color(logger, "INFO", f"Loading data from {input_path}", "cyan")
     df = pd.read_json(input_path, lines=True)
-    if sample_num != -1:
-        df = df.sample(n=sample_num, random_state=0).sort_index()
+    if sample_num != -1 and sample_num < len(df):
+        df = df.sample(n=sample_num, random_state=0)
+    df = df.sort_index()
     log_with_color(logger, "INFO", f"Loaded {len(df)} rows", "red")
     llm = get_llm(model_path, beam_width=beam_width)
     
