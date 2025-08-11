@@ -7,6 +7,7 @@ Performs model merging and generation with cleanup
 import os
 import shutil
 import sys
+import torch
 import pandas as pd
 from typing import Optional
 
@@ -16,7 +17,7 @@ from processor.generate import generate_data
 from processor.utils import save_csv_with_precision, get_merged_name
 
 # Fallback defaults
-MODES = ["hllm"]
+MODES = ["sem_id"]
 SPLITS = ["phase2"]
 SOURCE_DOMAIN = "Video_Games"
 TARGET_DOMAINS = ["Sports_and_Outdoors"]
@@ -201,7 +202,7 @@ class ModelMerger:
         if not model_name:
             print("Failed to get model name from merging process")
             return False
-        
+        torch.cuda.empty_cache()
         # Step 2: Run generation
         if not args.skip_generation:
             self.run_generation(model_name)
@@ -245,7 +246,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     all_eval_names = []
 
-    args.gpu_id = "0"
+    args.gpu_id = "1"
 
     # args.skip_merging = True
     # args.skip_generation = True
@@ -255,6 +256,6 @@ if __name__ == "__main__":
         args.beam_width = BEAM_WIDTHS.get(args.mode, 5)
 
     from test.test_loop import get_eval_groups
-    eval_groups = get_eval_groups("single_test_merging")(args, ModelMerger)
+    eval_groups = get_eval_groups("all_merging")(args, ModelMerger)
 
     merge_and_eval(args, eval_groups)

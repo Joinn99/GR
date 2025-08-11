@@ -72,9 +72,9 @@ def get_merged_name(mode: str, source_domain: str, target_domains: List[str], sp
     target_domains = [domain[:3] for domain in target_domains]
 
     if len(splits) == 1:
-        return f"merged_{source_domain}_{''.join(target_domains)}-{splits[0]}-{mode}-{method[:4]}"
+        return f"merged-{source_domain}-{''.join(target_domains)}-{splits[0]}-{mode}-{method[:4]}"
     else:
-        return f"merged_{source_domain}_{''.join(splits)}-{mode}-{method[:4]}"
+        return f"merged-{source_domain}-{''.join(splits)}-{mode}-{method[:4]}"
 
 
 def init_seed(seed, reproducibility):

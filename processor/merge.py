@@ -177,6 +177,9 @@ def merge_models(mode, source_domain, target_domains, splits, method, base_model
         mode=mode,
         name=output_name
     )
+    del merged_model
+    del models_to_merge
+    torch.cuda.empty_cache()
 
     log_with_color(logger, "INFO", "Model merging process completed", "magenta")
     return output_name

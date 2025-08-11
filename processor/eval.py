@@ -44,7 +44,7 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, met
     from embed import generate_embeddings
 
     if not eval_names:
-        eval_names = [(split, f"{domain}_{split}_title") for split in splits]
+        eval_names = [(split, f"{domain}-{split}-title") for split in splits]
     for eval_name in eval_names:
         log_with_color(logger, "INFO", f"Evaluating {eval_name[1]}...", "magenta")
         eval_set_path = f"data/outputs/amazon_{eval_name[1]}.jsonl"
@@ -114,7 +114,7 @@ def sem_id_eval(domain, splits, top_k=[10, 20, 50], eval_names=None):
     item = item.set_index("item_id")
 
     if not eval_names:
-        eval_names = [(split, f"{domain}_{split}_sem_id") for split in splits]
+        eval_names = [(split, f"{domain}-{split}-sem_id") for split in splits]
 
     all_metrics = []
     for eval_name in eval_names:
