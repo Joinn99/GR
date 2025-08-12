@@ -107,7 +107,7 @@ def generate_data(model_path, mode, split, domain, beam_width, sample_num, outpu
     if output_name:
         output_path = f"data/outputs/amazon_{output_name}.jsonl"
     else:
-        output_path = f"data/outputs/amazon_{domain}_{split}_{mode}.jsonl"
+        output_path = f"data/outputs/amazon_{domain}-{split}-{mode}.jsonl"
 
     log_with_color(logger, "INFO", f"Loading data from {input_path}", "cyan")
     df = pd.read_json(input_path, lines=True)
