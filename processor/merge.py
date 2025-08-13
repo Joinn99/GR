@@ -104,7 +104,7 @@ def save_merged_model(merged_model, merged_model_path: str, output_path: str, mo
     copied_files = 0
     if mode in ["title", "sem_id"]:
         for file in os.listdir(merged_model_path):
-            if not file.endswith(".safetensors") or not file.endswith(".pth"):
+            if (not file.endswith(".safetensors")) and (not file.endswith(".pth")):
                 src_path = f"{merged_model_path}/{file}"
                 dst_path = f"{output_path}/{file}"
                 shutil.copy(src_path, dst_path)
