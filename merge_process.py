@@ -20,12 +20,12 @@ from processor.utils import save_csv_with_precision, get_merged_name
 MODES = ["sem_id"]
 SPLITS = ["phase2"]
 SOURCE_DOMAIN = "Video_Games"
-TARGET_DOMAINS = ["Sports_and_Outdoors"]
-METHODS = ["task_arithmetic"]
+TARGET_DOMAINS = ["Books"]
+METHODS = ["average_merging"]
 
 # Default Settings
 HLLM_CLASS_PATH = "/data/tjwei/HLLM/code"
-BEAM_WIDTHS = {"sem_id": 50, "title": 5, "hllm": -1}
+BEAM_WIDTHS = {"sem_id": 20, "title": 5, "hllm": -1}
 
 
 def setup_argparse():
@@ -57,7 +57,7 @@ def setup_argparse():
     # Generation parameters
     parser.add_argument("--beam_width", type=int, default=None,
                        help="Beam width for generation (auto-set based on mode if not specified)")
-    parser.add_argument("--sample_num", type=int, default=2000,
+    parser.add_argument("--sample_num", type=int, default=5000,
                        help="Number of samples to generate")
     parser.add_argument("--gpu_id", type=str, default="0",
                        help="GPU ID to use")
@@ -74,8 +74,6 @@ def setup_argparse():
                        help="Skip merging")
     parser.add_argument("--skip_generation", action="store_true",
                        help="Skip generation")
-
-    
     return parser
 
 
@@ -215,7 +213,7 @@ class ModelMerger:
         return model_name
 
 
-def merge_and_eval(args, eval_groups):
+def merge_and_eval(args, eval_groups, top_k=[5,10,20]):
     if args.mode == "title":
         from processor.embed import initialize_model
         embed_model = initialize_model(
@@ -230,9 +228,11 @@ def merge_and_eval(args, eval_groups):
 
     for source, eval_names in eval_groups.items():
         if args.mode == "title":
-            metrics = title_eval(source, None, embed_model, beam_size=args.beam_width, rescale=args.rescale, eval_names=eval_names)
+            metrics = title_eval(source, None, embed_model, top_k=top_k, beam_size=3, rescale=True, eval_names=eval_names)
         elif args.mode == "sem_id":
-            metrics = sem_id_eval(source, None, eval_names=eval_names)
+            # embed_model_path = f"data/tokens/amazon_{source}_model.pth"
+            # embed_model = torch.load(embed_model_path)
+            metrics = sem_id_eval(source, None, top_k=top_k, eval_names=eval_names)
         elif args.mode == "hllm":
             metrics = None
         else:
@@ -246,16 +246,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
     all_eval_names = []
 
-    args.gpu_id = "1"
+    args.gpu_id = "2"
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
-    # args.skip_merging = True
-    # args.skip_generation = True
-    # args.skip_cleanup = True
+    args.skip_merging = True
+    args.skip_generation = True
+    args.skip_cleanup = True
 
     if not args.beam_width:
         args.beam_width = BEAM_WIDTHS.get(args.mode, 5)
 
     from test.test_loop import get_eval_groups
-    eval_groups = get_eval_groups("all_merging")(args, ModelMerger)
+    eval_groups = get_eval_groups("add_one_merging")(args, ModelMerger)
 
     merge_and_eval(args, eval_groups)

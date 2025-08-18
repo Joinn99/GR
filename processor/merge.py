@@ -68,7 +68,7 @@ def get_models(mode:str,merged_model_name: str, models_to_merge_names: List[str]
         models_to_merge.append(model)
     
     models_to_merge.append(merged_model)
-    if method not in ["average_merging", "mask_merging"]:
+    if method not in ["average_merging"]:
         if mode == "sem_id":
             kwargs["resize_token_embeddings"] = merged_model.vocab_size
         log_with_color(logger, "INFO", f"Initialize model from {kwargs.get('base_model_path', None)}", "cyan")
