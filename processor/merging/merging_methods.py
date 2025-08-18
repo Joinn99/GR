@@ -248,7 +248,7 @@ class MaskMerging(ModelMergingMethod):
     def merge(self, merged_model: nn.Module, models_to_merge: list, exclude_param_names_regex: list, 
               weight_format: str = "delta_weight", weight_mask_rates: list = None, 
               use_weight_rescale: bool = True, mask_strategy: str = "random", 
-              mask_apply_method: str = "average_merging", models_use_deepcopy: bool = False, **kwargs):
+              mask_apply_method: str = "ties_merging", models_use_deepcopy: bool = False, **kwargs):
         """
         Mask merging method
         :param merged_model: nn.Module, the merged model
