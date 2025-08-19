@@ -62,10 +62,23 @@ def parse_arguments():
         help='Index of the item information to use'
     )
     
+    parser.add_argument(
+        '--time_filter',
+        type=str,
+        default=None,
+        help='Time filter for the dataset'
+    )
+
+    parser.add_argument(
+        '--test',
+        action='store_true',
+        help='Whether to use the test data'
+    )
+
     return parser.parse_args()
 
 
-def load_data(domain):
+def load_data(domain, time_filter=None):
     """Load and preprocess the dataset."""
     log_with_color(logger, "INFO", f"Loading dataset for domain: {domain}", "magenta")
     
@@ -76,6 +89,8 @@ def load_data(domain):
     
     # Convert timestamp and sort
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+    if time_filter:
+        df = df[df["timestamp"] < time_filter]
     df = df.sort_values(by="timestamp").groupby("user_id").agg(list)
     
     # Load item information
@@ -112,14 +127,15 @@ def assemble_user_data(
         max_len=30,
         min_len=5,
         max_user_sample=5,
-        index="title"
+        index="title",
+        test=False
     ):
     """Assemble training data for a user's interaction sequence."""
     
     results = []
     item_info = all_item_info.loc[item_id_list]    
-
-    for i in range(min_len-1, len(item_id_list)):
+    iterator = range(min_len-1, len(item_id_list)) if not test else [len(item_id_list)-1]
+    for i in iterator:
         idx_start = max(0, i-max_len)
         results.append(
             {
@@ -130,7 +146,7 @@ def assemble_user_data(
                 "aux": False
             }
         )
-        if index == "sem_id":
+        if (not test) and (index == "sem_id"):
             results.append(
                 {
                     "messages": formulate_message(item_info, item_id_list[idx_start:i], item_id_list[i], "title", index),
@@ -181,7 +197,7 @@ def main():
     log_with_color(logger, "INFO", f"Starting data generation for domain: {args.domain}", "magenta")
     
     # Load data
-    df, item = load_data(args.domain)
+    df, item = load_data(args.domain, time_filter="2023-04-01" if args.test else None)
     random.seed(0)
     # Generate training data
     log_with_color(logger, "INFO", f"Generating training data for {args.domain}", "magenta")
@@ -190,7 +206,8 @@ def main():
             x["item_id"], x["timestamp"], item,
             max_len=args.max_len, min_len=args.min_len,
             max_user_sample=args.max_user_sample,
-            index=args.index
+            index=args.index,
+            test=args.test
         ), axis=1
     )
     output_data = output_data.explode()
@@ -199,7 +216,6 @@ def main():
         columns=["messages", "timestamp", "item_id", "history", "aux"],
         index=output_data.index
     )
-    
     data_split = time_split_data(output_data)
     for phase, df_phase in data_split.items():
         if phase == "test":
