@@ -6,7 +6,8 @@ from tqdm import tqdm
 from logger import get_logger, log_with_color
 
 tqdm.pandas()
-
+from vllm import LLM
+from SemLLM import SemLLM
 # Configure logging with colors
 logger = get_logger(__name__)
 logger.propagate = False
@@ -14,10 +15,13 @@ logger.propagate = False
 def get_llm(
     model_path,
     beam_width=None,
+    mode="title",
 ):
     from vllm import LLM
+    from SemLLM import SemLLM
+    llm_class = LLM
     max_logprobs = 2 * beam_width if beam_width else 20
-    llm = LLM(
+    llm = llm_class(
         model=model_path,
         tensor_parallel_size=1,
         gpu_memory_utilization=0.8,
@@ -45,7 +49,7 @@ def batch_chat(
         add_generation_prompt=False,
         chat_template_kwargs={"enable_thinking": False},
     )
-    return [e.outputs[0].text for e in output]
+    return [[e.outputs[0].text] for e in output]
 
 from vllm import LLM
 
@@ -115,15 +119,15 @@ def generate_data(model_path, mode, split, domain, beam_width, sample_num, outpu
         df = df.sample(n=sample_num, random_state=0)
     df = df.sort_index()
     log_with_color(logger, "INFO", f"Loaded {len(df)} rows", "red")
-    llm = get_llm(model_path, beam_width=beam_width)
+    llm = get_llm(model_path, beam_width=beam_width, mode=mode)
     
     prompt_prefix = "Recommended Item Title:" if mode == "title" else "Recommended Item Index: "
     
     log_with_color(logger, "INFO", f"Batch chatting...", "magenta")
     df["messages"] = df["messages"].apply(lambda x: x[:-1] + [{"role": "assistant", "content": prompt_prefix}])
     if mode == "title":
-        outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=beam_width, max_tokens=32)
-        # outputs = batch_chat(llm, df["messages"].tolist())
+        # outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=beam_width, max_tokens=32)
+        outputs = batch_chat(llm, df["messages"].tolist())
     else:
         outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=beam_width, max_tokens=4)
     log_with_color(logger, "INFO", f"Batch chatting done", "magenta")

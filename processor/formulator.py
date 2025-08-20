@@ -1,10 +1,11 @@
 import os
 import random
 import argparse
+import datetime
 import pandas as pd
 from tqdm import tqdm
 
-from utils import time_split_data
+from utils import time_split_data, TIME_SPLIT
 from prompt import prompt_template, item_template, prediction_template
 from logger import get_logger, log_with_color
 
@@ -61,19 +62,6 @@ def parse_arguments():
         choices=['title', 'sem_id'],
         help='Index of the item information to use'
     )
-    
-    parser.add_argument(
-        '--time_filter',
-        type=str,
-        default=None,
-        help='Time filter for the dataset'
-    )
-
-    parser.add_argument(
-        '--test',
-        action='store_true',
-        help='Whether to use the test data'
-    )
 
     return parser.parse_args()
 
@@ -128,14 +116,27 @@ def assemble_user_data(
         min_len=5,
         max_user_sample=5,
         index="title",
-        test=False
+        test=True,
+        valid_period=("2017-01-01", "2023-04-01"),
     ):
     """Assemble training data for a user's interaction sequence."""
     
     results = []
     item_info = all_item_info.loc[item_id_list]    
-    iterator = range(min_len-1, len(item_id_list)) if not test else [len(item_id_list)-1]
-    for i in iterator:
+    start, end = datetime.datetime.strptime(valid_period[0], "%Y-%m-%d"), datetime.datetime.strptime(valid_period[1], "%Y-%m-%d")
+    if test:
+        valid_idx = [len(item_id_list)-1] if start <= timestamp_list[-1] < end else []
+    else:
+        valid_idx = []
+        for i in range(min_len-1, len(item_id_list)):
+            if timestamp_list[i] < start: continue
+            elif timestamp_list[i] >= end: break
+            else: valid_idx.append(i)
+
+        if len(valid_idx) > max_user_sample:
+            valid_idx = random.sample(valid_idx, max_user_sample)
+
+    for i in valid_idx:
         idx_start = max(0, i-max_len)
         results.append(
             {
@@ -165,11 +166,6 @@ def assemble_user_data(
                     "aux": True
                 }
             )
-
-    sample_limit = max_user_sample if index == "title" else 3*max_user_sample
-
-    if len(results) > sample_limit:
-        results = random.sample(results, sample_limit)
     
     return results
 
@@ -197,39 +193,37 @@ def main():
     log_with_color(logger, "INFO", f"Starting data generation for domain: {args.domain}", "magenta")
     
     # Load data
-    df, item = load_data(args.domain, time_filter="2023-04-01" if args.test else None)
+    df, item = load_data(args.domain, time_filter=TIME_SPLIT[-1][0][1])
     random.seed(0)
     # Generate training data
     log_with_color(logger, "INFO", f"Generating training data for {args.domain}", "magenta")
-    output_data = df.progress_apply(
-        lambda x: assemble_user_data(
-            x["item_id"], x["timestamp"], item,
-            max_len=args.max_len, min_len=args.min_len,
-            max_user_sample=args.max_user_sample,
-            index=args.index,
-            test=args.test
-        ), axis=1
-    )
-    output_data = output_data.explode()
-    output_data = pd.DataFrame(
-        output_data.tolist(),
-        columns=["messages", "timestamp", "item_id", "history", "aux"],
-        index=output_data.index
-    )
-    data_split = time_split_data(output_data)
-    for phase, df_phase in data_split.items():
-        if phase == "test":
-            df_phase = df_phase[~df_phase["aux"]]
-            df_phase = df_phase.sort_values(by="timestamp").groupby(level=0).agg("last")
-        else:
-            df_phase = df_phase.drop(columns=["history"])
+
+    for period, phase in TIME_SPLIT:
+        output_data = df.progress_apply(
+            lambda x: assemble_user_data(
+                x["item_id"], x["timestamp"], item,
+                max_len=args.max_len, min_len=args.min_len,
+                max_user_sample=5 if phase == "pretrain" else 1e9,
+                index=args.index,
+                test=(phase == "test"),
+                valid_period=period
+            ), axis=1
+        )
+        output_data = output_data.explode().dropna()
+        output_data = pd.DataFrame(
+            output_data.tolist(),
+            columns=["messages", "timestamp", "item_id", "history", "aux"],
+            index=output_data.index
+        )
+
+        if phase != "test":
+            output_data = output_data.drop(columns=["history"])
             if args.index == "sem_id":
-                df_phase = df_phase.groupby(["user_id", "item_id", "timestamp", "aux"]).sample(n=1)
-        df_phase = df_phase.reset_index().drop(columns=["aux"])
-        save_data(df_phase.sort_values(by="timestamp"), args.domain, phase, args.index)
+                output_data = output_data.groupby(["user_id", "item_id", "timestamp", "aux"]).sample(n=1)
+        output_data = output_data.reset_index().drop(columns=["aux"])
+        save_data(output_data.sort_values(by="timestamp"), args.domain, phase, args.index)
     
     log_with_color(logger, "INFO", "Data generation completed successfully!", "magenta")
-
 
 if __name__ == "__main__":
     main()

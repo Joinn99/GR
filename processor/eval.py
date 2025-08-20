@@ -65,7 +65,7 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, met
 
         for i in range(0, len(eval_embeddings), batch_size):
             batch_eval_embeddings = eval_embeddings[i:i+batch_size]
-            history_ids = eval_set["history_ids"].iloc[i:i+batch_size].reset_index(drop=True).explode().reset_index().to_numpy().astype(int)
+            history_ids = eval_set["history_ids"].iloc[i:i+batch_size].reset_index(drop=True).explode().dropna().reset_index().to_numpy().astype(int)
 
             # Calculate distance between batch_eval_embeddings and item_embeddings
             distance = torch.matmul(batch_eval_embeddings, item_embeddings.T)   # [batch_size, N, I]
@@ -82,7 +82,7 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, met
                 distance = torch.min(distance, dim=1).values
                 distance[tuple(history_ids.T)] = float('inf')
                 if rescale:
-                    item_coeff = get_pop_coeff(domain, threshold="2023-01-01", half_life=1e10, gamma=0.2)
+                    item_coeff = get_pop_coeff(domain, threshold="2023-01-01", half_life=30, gamma=0.25)
                     rescale_coeff = torch.from_numpy(item_set.join(item_coeff, on="item_id", how="left").fillna(0).loc[:, "coeff"].to_numpy()).unsqueeze(0)
                 else:
                     rescale_coeff = 1.
@@ -141,7 +141,7 @@ def sem_id_eval_distance(domain, splits, embed_model, top_k=[10, 20, 50], beam_s
     log_with_color(logger, "INFO", f"Loaded {item_embeddings.shape[0]} item embeddings", "cyan")
     item_embeddings = torch.from_numpy(item_embeddings)
 
-    batch_size = 1024
+    batch_size = 256
 
     all_metrics = []
 
@@ -292,7 +292,7 @@ if __name__ == "__main__":
             all_metrics.extend(metrics)
         elif args.mode == "title":
             log_with_color(logger, "INFO", f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}", "magenta")
-            metrics = title_eval(domain, args.split, embed_model, top_k=args.top_k, beam_size=3, rescale=args.rescale)
+            metrics = title_eval(domain, args.split, embed_model, top_k=args.top_k, beam_size=1, rescale=args.rescale)
             all_metrics.extend(metrics)
 
     output_df = pd.DataFrame(all_metrics)
