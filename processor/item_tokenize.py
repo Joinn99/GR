@@ -41,6 +41,9 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     embeddings = torch.from_numpy(embeddings).float().to(device)
     
+    from utils import init_seed
+    init_seed(0, reproducibility=True)
+
     log_with_color(logger, "INFO", f"Fitting model with {args.n_layers} layers and cluster sizes {args.cluster_sizes}", "magenta")
     try:
         from vector_quantize_pytorch import ResidualVQ
