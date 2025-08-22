@@ -107,7 +107,7 @@ def build_hist_cdf(flattened_models_param: torch.Tensor, bins: int = 500, bin_ra
 
 class StatsComputer:
     def __init__(self, args):
-        self.mode = args.mode
+        self.modes = args.modes
         self.splits = args.splits
         self.source_domain = args.source_domain
         self.target_domains = args.target_domains
@@ -124,23 +124,46 @@ class StatsComputer:
 
     def _load_models(self):
         # Resolve model paths similarly to processor.merge.get_models usage in notebook
-        if len(self.splits) == 1:
-            merged_model_path = get_model_path(self.mode, self.splits[0], self.source_domain)
-            models_to_merge_paths = [
-                get_model_path(self.mode, self.splits[0], tgt) for tgt in self.target_domains
-            ]
-        else:
-            merged_model_path = get_model_path(self.mode, self.splits[0], self.source_domain)
-            models_to_merge_paths = [get_model_path(self.mode, split, self.source_domain) for split in self.splits]
+        if len(self.modes) == 1:
+            if len(self.splits) == 1:
+                merged_model_path = get_model_path(self.modes[0], self.splits[0], self.source_domain)
+                models_to_merge_paths = [
+                    get_model_path(self.modes[0], self.splits[0], tgt) for tgt in self.target_domains
+                ]
+            else:
+                merged_model_path = get_model_path(self.modes[0], self.splits[0], self.source_domain)
+                models_to_merge_paths = [get_model_path(self.modes[0], split, self.source_domain) for split in self.splits[1:]]
 
-        merged_model, models_to_merge = get_models(
-            mode=self.mode,
-            merged_model_name=merged_model_path,
-            models_to_merge_names=models_to_merge_paths,
-            method=self.method,
-            base_model_path=self.base_model_path,
-            class_path=self.hllm_class_path,
-        )
+            merged_model, models_to_merge = get_models(
+                mode=self.modes[0],
+                merged_model_name=merged_model_path,
+                models_to_merge_names=models_to_merge_paths,
+                method=self.method,
+                base_model_path=self.base_model_path,
+                class_path=self.hllm_class_path,
+            )
+        else:
+            models_to_merge_paths = [get_model_path(mode, self.splits[0], self.source_domain) for mode in self.modes]
+            merged_model, models_to_merge = get_models(
+                mode=self.modes[0],
+                merged_model_name=models_to_merge_paths[0],
+                models_to_merge_names=[],
+                method="ties_merging",
+                base_model_path=self.base_model_path,
+                class_path=self.hllm_class_path,
+            )
+            for mode, model_path in zip(self.modes[1:], models_to_merge_paths[1:]):
+                new_merged_model, _ = get_models(
+                    mode=mode,
+                    merged_model_name=model_path,
+                    models_to_merge_names=[],
+                    method="average_merging",
+                    base_model_path=self.base_model_path,
+                    class_path=self.hllm_class_path,
+                )
+                models_to_merge.append(new_merged_model)
+            merged_model = merged_model.item_llm.cpu() if self.modes[0] == "hllm" else merged_model.model.cpu()
+            models_to_merge = [model.item_llm.cpu() if mode == "hllm" else model.model.cpu() for mode, model in zip(self.modes, models_to_merge)]
         return merged_model, models_to_merge
 
     @torch.no_grad()
@@ -162,7 +185,7 @@ class StatsComputer:
         os.makedirs(os.path.dirname(self.stats_out), exist_ok=True)
         row = {
             "group": group_name,
-            "mode": self.mode,
+            "mode": "+".join(self.modes),
             "splits": "+".join(self.splits),
             "source": self.source_domain,
             "targets": "+".join(self.target_domains),
@@ -191,7 +214,7 @@ class StatsComputer:
             os.environ["CUDA_VISIBLE_DEVICES"] = str(self.gpu_id)
 
         group_name = get_merged_name(
-            mode=self.mode,
+            mode=self.modes[0],
             source_domain=self.source_domain,
             target_domains=self.target_domains,
             splits=self.splits,
@@ -199,20 +222,19 @@ class StatsComputer:
         )
 
         merged_model, models_to_merge = self._load_models()
-        try:
-            flattened = self._compute_flattened_vectors(merged_model, models_to_merge)
-            stats = compute_sign_stats(flattened)
-            self._append_stat_row(group_name, stats)
-            self._export_hist_csv(group_name, flattened)
-        finally:
-            # Cleanup to free memory
-            del merged_model
-            del models_to_merge
-            gc.collect()
-            try:
-                torch.cuda.empty_cache()
-            except Exception:
-                pass
+        flattened = self._compute_flattened_vectors(merged_model, models_to_merge)
+        stats = compute_sign_stats(flattened)
+        self._append_stat_row(group_name, stats)
+        self._export_hist_csv(group_name, flattened)
+        # finally:
+        #     # Cleanup to free memory
+        #     del merged_model
+        #     del models_to_merge
+        #     gc.collect()
+        #     try:
+        #         torch.cuda.empty_cache()
+        #     except Exception:
+        #         pass
         return group_name
 
 
@@ -221,7 +243,7 @@ def setup_argparse():
     parser = argparse.ArgumentParser(description="Sign-conflict statistics over merging groups")
 
     # Core parameters (mirror merge_process defaults/options)
-    parser.add_argument("--mode", type=str, default="sem_id", choices=["title", "sem_id", "hllm"], help="Model mode")
+    parser.add_argument("--modes", nargs="+", default=["sem_id"], help="Model mode")
     parser.add_argument("--source_domain", type=str, default="Books", help="Source domain name")
     parser.add_argument("--splits", nargs="+", default=["phase2"], help="List of splits")
     parser.add_argument("--target_domains", nargs="+", default=["Sports_and_Outdoors"], help="Target domain names")
@@ -245,7 +267,7 @@ def setup_argparse():
     parser.add_argument("--hist_dir", type=str, default="stats", help="Directory to export histogram CSVs")
 
     # Loop selection akin to merge_process
-    parser.add_argument("--loop", type=str, default="add_one_merging", choices=["all_merging", "add_one_merging", "single_test_merging"], help="Looping strategy over groups")
+    parser.add_argument("--loop", type=str, default="single_test_merging", choices=["all_merging", "add_one_merging", "single_test_merging"], help="Looping strategy over groups")
     return parser
 
 
@@ -261,6 +283,14 @@ def run_loop(args) -> dict:
 if __name__ == "__main__":
     parser = setup_argparse()
     args = parser.parse_args()
+
+    args.modes = ["sem_id", "hllm"]
+    args.source_domain = "Video_Games"
+    args.target_domains = []
+    args.splits = ["phase2"]
+    args.method = "ties_merging"
+    args.base_model_path = "/data/zoo/Qwen3-0.6B"
+    args.hllm_class_path = "/data/tjwei/HLLM/code"
 
     # Ensure deterministic default dtype for any CPU ops
     torch.set_grad_enabled(False)

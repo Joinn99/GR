@@ -103,7 +103,7 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, met
     return all_metrics
 
 
-def get_sem_id_embedding(code, codebook, num_layers=3, layer_size=256):
+def get_sem_id_embedding(code, codebook, num_layers=4, layer_size=256):
     """
     decode the text like "<a_1><b_2><c_3><d_4>" to a list of strings like ["a_1", "b_2", "c_3", "d_4"]
     each code is a string like "<a_1>", where "a" denotes the layer index and "1" denotes the token index

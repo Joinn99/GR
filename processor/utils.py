@@ -67,7 +67,7 @@ def format_float_columns(df, precision=6):
     return df_formatted
 
 def get_merged_name(mode: str, source_domain: str, target_domains: List[str], splits: List[str], method: str):
-    assert min(len(splits), len(target_domains)) == 1, "Split and target domains cannot be > 1 at the same time"
+    assert min(len(splits), len(target_domains)) <= 1, "Split and target domains cannot be > 1 at the same time"
     source_domain = source_domain[:3]
     target_domains = [domain[:3] for domain in target_domains]
 
