@@ -40,6 +40,23 @@ def task_vector_param_dict_to_single_vector(task_vector: TaskVector) -> torch.Te
         return torch.empty(0, dtype=torch.float32)
     return torch.cat(flat_parts, dim=0)
 
+def mask_smallest_magnitude_param_values(flattened_models_to_merge_param: torch.Tensor, param_value_mask_rate: float = 0.8):
+    """
+    Mask the smallest-magnitude parameter values (set to zeros) based on parameter value mask rate
+    :param flattened_models_to_merge_param: Tensor, shape (num_models_to_merge, num_total_params), flattened parameters of individual models that need to be merged
+    :param param_value_mask_rate: float, mask rate of the smallest-magnitude parameter values
+    :return: torch.Tensor, masked parameters
+    """
+    # num_models_to_merge, num_total_params = flattened_models_to_merge_param.shape
+    num_mask_params = int(flattened_models_to_merge_param.shape[1] * param_value_mask_rate)
+
+    # Tensor, shape (num_models_to_merge, 1), find the num_mask_params-th smallest magnitude element of all the parameters in each individual model
+    kth_values, _ = flattened_models_to_merge_param.abs().kthvalue(k=num_mask_params, dim=1, keepdim=True)
+    # Tensor, shape (num_models_to_merge, num_total_params), where True is for parameters that we want to preserve
+    mask = flattened_models_to_merge_param.abs() >= kth_values
+
+    return flattened_models_to_merge_param * mask
+
 
 @torch.no_grad()
 def compute_sign_stats(flattened_tensor: torch.Tensor) -> dict:
@@ -67,7 +84,7 @@ def compute_sign_stats(flattened_tensor: torch.Tensor) -> dict:
     all_same_sign = (pos.all(dim=0) | neg.all(dim=0)).sum().item()                                  # param all positive or all negative
     sign_conflict = ((pos.any(dim=0) & neg.any(dim=0))).sum().item()                                # param conflict
     all_zero = zero.all(dim=0).sum().item()                                                         # param all zero
-    first_dominant = ((pos[0] | neg[0]) & zero[1:].all(dim=0)).sum().item()                            # param in first model dominates
+    first_dominant = ((pos[-1] | neg[-1]) & zero[:-1].all(dim=0)).sum().item()                            # param in first model dominates
     total_params = flattened_tensor.shape[1]
     other_dominant = int(total_params - all_same_sign - sign_conflict - all_zero - first_dominant)  # param in other models dominates
     
@@ -129,6 +146,7 @@ class StatsComputer:
         self.hist_max = args.hist_max
         self.stats_out = args.stats_out
         self.hist_dir = args.hist_dir
+        self.param_value_mask_rate = args.param_value_mask_rate
 
     def _load_models(self):
         # Resolve model paths similarly to processor.merge.get_models usage in notebook
@@ -220,6 +238,8 @@ class StatsComputer:
         try:
             merged_model, models_to_merge = self._load_models()
             flattened = self._compute_flattened_vectors(merged_model, models_to_merge)
+            if self.param_value_mask_rate > 0:
+                flattened = mask_smallest_magnitude_param_values(flattened, self.param_value_mask_rate)
             stats = compute_sign_stats(flattened)
             self._append_stat_row(group_name, stats)
             self._export_hist_csv(group_name, flattened)
@@ -262,6 +282,7 @@ def setup_argparse():
     # Outputs
     parser.add_argument("--stats_out", type=str, default="data/archive/stat.tsv", help="TSV to append stats rows")
     parser.add_argument("--hist_dir", type=str, default="data/stats", help="Directory to export histogram CSVs")
+    parser.add_argument("--param_value_mask_rate", type=float, default=0.0, help="Mask rate of the smallest-magnitude parameter values")
 
     return parser
 
@@ -279,7 +300,7 @@ if __name__ == "__main__":
     parser = setup_argparse()
     args = parser.parse_args()
 
-    args.modes = ["hllm"]
+    args.modes = ["sem_id"]
     args.source_domain = "Video_Games"
     args.splits = ["phase2"]
 
