@@ -19,7 +19,7 @@ def get_llm(
 ):
     from vllm import LLM
     from SemLLM import SemLLM
-    llm_class = LLM
+    llm_class = SemLLM if mode == "sem_id" else LLM
     max_logprobs = 2 * beam_width if beam_width else 20
     llm = llm_class(
         model=model_path,
@@ -29,6 +29,7 @@ def get_llm(
         trust_remote_code=True,
         enforce_eager=True,
         max_logprobs=max_logprobs,
+        logprobs_mode="processed_logprobs" if mode == "sem_id" else "raw_logprobs",
     )
     return llm
 
