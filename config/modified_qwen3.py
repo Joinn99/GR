@@ -1,5 +1,6 @@
 from torchtune.models.qwen3._component_builders import qwen3
 from torchtune.modules import TransformerDecoder
+import torch
 
 def qwen3_0_6b_instruct() -> TransformerDecoder:
     """
@@ -28,3 +29,29 @@ def qwen3_0_6b_instruct() -> TransformerDecoder:
         q_norm=True,
         k_norm=True,
     )
+
+def qwen3_0_6b_instruct_fixed() -> TransformerDecoder:
+    model = qwen3(
+        vocab_size=151936,
+        num_layers=28,
+        num_heads=16,
+        num_kv_heads=8,
+        embed_dim=1024,
+        intermediate_dim=3072,
+        max_seq_len=40960,
+        head_dim=128,
+        attn_dropout=0.0,
+        norm_eps=1e-6,
+        rope_base=1000000.0,
+        tie_word_embeddings=True,
+        q_proj_bias=False,
+        k_proj_bias=False,
+        v_proj_bias=False,
+        q_norm=True,
+        k_norm=True,
+    )
+
+    for layer in model.layers:
+        layer.requires_grad_(False)
+    model.norm.requires_grad_(False)
+    return model
