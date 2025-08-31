@@ -60,7 +60,7 @@ def parse_arguments():
 
 def initialize_model(model_path, gpu_id, gpu_memory_utilization, max_model_len):
     """Initialize the embedding model."""
-    os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
+    # os.environ["CUDA_VISIBLE_DEVICES"] = gpu_id
     from vllm import LLM
     model = LLM(
         model=model_path,

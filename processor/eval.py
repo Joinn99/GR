@@ -39,7 +39,7 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, met
     log_with_color(logger, "INFO", f"Loaded {item_embeddings.shape[0]} item embeddings", "cyan")
     item_embeddings = torch.from_numpy(item_embeddings)
 
-    batch_size = 256
+    batch_size = 512
 
     all_metrics = []
     from embed import generate_embeddings
@@ -59,7 +59,7 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, met
             output_titles.apply(lambda x: x.strip().split("\n")[0]),
             with_description=False
         )
-        eval_embeddings = eval_embeddings.reshape((eval_embeddings.shape[0] // beam_size, beam_size, -1))
+        eval_embeddings = eval_embeddings.reshape((eval_embeddings.shape[0] // beam_size, beam_size, -1)).to("cuda:1")
 
         all_closest_items = []
 
@@ -68,25 +68,25 @@ def title_eval(domain, splits, embed_model, top_k=[10, 20, 50], beam_size=5, met
             history_ids = eval_set["history_ids"].iloc[i:i+batch_size].reset_index(drop=True).explode().dropna().reset_index().to_numpy().astype(int)
 
             # Calculate distance between batch_eval_embeddings and item_embeddings
-            distance = torch.matmul(batch_eval_embeddings, item_embeddings.T)   # [batch_size, N, I]
+            distance = torch.matmul(batch_eval_embeddings, item_embeddings.to("cuda:1").T)   # [batch_size, N, I]
             if metric == "cosine":
                 cosine_similarity = distance / torch.norm(batch_eval_embeddings, dim=-1, keepdim=True)
-                cosine_similarity = cosine_similarity / torch.norm(item_embeddings.unsqueeze(0), dim=-1, keepdim=True).transpose(1, 2)
+                cosine_similarity = cosine_similarity / torch.norm(item_embeddings.to("cuda:1").unsqueeze(0), dim=-1, keepdim=True).transpose(1, 2)
                 cosine_similarity = torch.max(cosine_similarity, dim=1).values
                 cosine_similarity[tuple(history_ids.T)] = float('-inf')
                 item_rankings = torch.topk(cosine_similarity, k=max(top_k), dim=1, largest=True).indices
             else:
                 distance = torch.norm(batch_eval_embeddings, dim=-1, keepdim=True) + \
-                            torch.norm(item_embeddings.unsqueeze(0), dim=-1, keepdim=True).transpose(1, 2) - \
+                            torch.norm(item_embeddings.to("cuda:1").unsqueeze(0), dim=-1, keepdim=True).transpose(1, 2) - \
                                 2 * distance
                 distance = torch.min(distance, dim=1).values
                 distance[tuple(history_ids.T)] = float('inf')
                 if rescale:
                     item_coeff = get_pop_coeff(domain, threshold="2023-01-01", half_life=30, gamma=0.25)
-                    rescale_coeff = torch.from_numpy(item_set.join(item_coeff, on="item_id", how="left").fillna(0).loc[:, "coeff"].to_numpy()).unsqueeze(0)
+                    rescale_coeff = torch.from_numpy(item_set.join(item_coeff, on="item_id", how="left").fillna(0).loc[:, "coeff"].to_numpy()).unsqueeze(0).to("cuda:1")
                 else:
                     rescale_coeff = 1.
-                item_rankings = torch.topk(distance / rescale_coeff, k=max(top_k), dim=1, largest=False).indices
+                item_rankings = torch.topk(distance / rescale_coeff, k=max(top_k), dim=1, largest=False).indices.cpu()
 
             # Get the closest item for each eva
             for i in range(item_rankings.shape[0]):
@@ -160,7 +160,7 @@ def sem_id_eval_distance(domain, splits, embed_model, top_k=[10, 20, 50], beam_s
             output_ids.apply(lambda x: get_sem_id_embedding(x, embed_model)).tolist(), dim=0
         ).to("cpu")
 
-        eval_embeddings = eval_embeddings.reshape((eval_embeddings.shape[0] // beam_size, beam_size, -1))
+        eval_embeddings = eval_embeddings.reshape((eval_embeddings.shape[0] // beam_size, beam_size, -1)).to("cuda:1")
 
         all_closest_items = []
 
@@ -169,25 +169,25 @@ def sem_id_eval_distance(domain, splits, embed_model, top_k=[10, 20, 50], beam_s
             history_ids = eval_set["history_ids"].iloc[i:i+batch_size].reset_index(drop=True).explode().dropna().reset_index().to_numpy().astype(int)
 
             # Calculate distance between batch_eval_embeddings and item_embeddings
-            distance = torch.matmul(batch_eval_embeddings, item_embeddings.T)   # [batch_size, N, I]
+            distance = torch.matmul(batch_eval_embeddings, item_embeddings.to("cuda:1").T)   # [batch_size, N, I]
             if metric == "cosine":
                 cosine_similarity = distance / torch.norm(batch_eval_embeddings, dim=-1, keepdim=True)
-                cosine_similarity = cosine_similarity / torch.norm(item_embeddings.unsqueeze(0), dim=-1, keepdim=True).transpose(1, 2)
+                cosine_similarity = cosine_similarity / torch.norm(item_embeddings.to("cuda:1").unsqueeze(0), dim=-1, keepdim=True).transpose(1, 2)
                 cosine_similarity = torch.max(cosine_similarity, dim=1).values
                 cosine_similarity[tuple(history_ids.T)] = float('-inf')
                 item_rankings = torch.topk(cosine_similarity, k=max(top_k), dim=1, largest=True).indices
             else:
                 distance = torch.norm(batch_eval_embeddings, dim=-1, keepdim=True) + \
-                            torch.norm(item_embeddings.unsqueeze(0), dim=-1, keepdim=True).transpose(1, 2) - \
+                            torch.norm(item_embeddings.to("cuda:1").unsqueeze(0), dim=-1, keepdim=True).transpose(1, 2) - \
                                 2 * distance
                 distance = torch.min(distance, dim=1).values
                 distance[tuple(history_ids.T)] = float('inf')
                 if rescale:
-                    item_coeff = get_pop_coeff(domain, threshold="2023-01-01", half_life=1e10, gamma=0.2)
-                    rescale_coeff = torch.from_numpy(item_set.join(item_coeff, on="item_id", how="left").fillna(0).loc[:, "coeff"].to_numpy()).unsqueeze(0)
+                    item_coeff = get_pop_coeff(domain, threshold="2023-01-01", half_life=30, gamma=0.25)
+                    rescale_coeff = torch.from_numpy(item_set.join(item_coeff, on="item_id", how="left").fillna(0).loc[:, "coeff"].to_numpy()).unsqueeze(0).to("cuda:1")
                 else:
                     rescale_coeff = 1.
-                item_rankings = torch.topk(distance / rescale_coeff, k=max(top_k), dim=1, largest=False).indices
+                item_rankings = torch.topk(distance / rescale_coeff, k=max(top_k), dim=1, largest=False).indices.cpu()
 
             # Get the closest item for each eva
             for i in range(item_rankings.shape[0]):
@@ -234,7 +234,7 @@ def sem_id_eval(domain, splits, top_k=[10, 20, 50], eval_names=None):
     return all_metrics
 
 def id_match(results, target):
-    t = target#.split("<d_")[0]
+    t = target.split("<d_")[0]
     output = [t in e for e in results]
     return output
     
@@ -288,11 +288,11 @@ if __name__ == "__main__":
             embed_model = torch.load(embed_model_path)
             log_with_color(logger, "INFO", f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}", "magenta")
             metrics = sem_id_eval(domain, args.split, top_k=args.top_k)
-            # metrics = sem_id_eval_distance(domain, args.split, embed_model, top_k=args.top_k, beam_size=10, rescale=args.rescale)
+            # metrics = sem_id_eval_distance(domain, args.split, embed_model, top_k=args.top_k, beam_size=args.beam_size, rescale=args.rescale)
             all_metrics.extend(metrics)
         elif args.mode == "title":
             log_with_color(logger, "INFO", f"Evaluating {args.mode} for {domain} on {args.split} with top_k={', '.join(map(str, args.top_k))}", "magenta")
-            metrics = title_eval(domain, args.split, embed_model, top_k=args.top_k, beam_size=1, rescale=args.rescale)
+            metrics = title_eval(domain, args.split, embed_model, top_k=args.top_k, beam_size=args.beam_size, rescale=args.rescale)
             all_metrics.extend(metrics)
 
     output_df = pd.DataFrame(all_metrics)

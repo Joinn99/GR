@@ -36,10 +36,12 @@ def get_llm(
 def batch_chat(
     llm,
     messages,
+    beam_width=20,
 ):
     from vllm import SamplingParams
     sampling_params=SamplingParams(
-        temperature=0.0,
+        n=beam_width,
+        temperature=0.6,
         max_tokens=32,
         stop=["\n"],
     )
@@ -50,7 +52,7 @@ def batch_chat(
         add_generation_prompt=False,
         chat_template_kwargs={"enable_thinking": False},
     )
-    return [[e.outputs[0].text] for e in output]
+    return [[e.outputs[i].text for i in range(beam_width)] for e in output]
 
 from vllm import LLM
 
@@ -128,7 +130,7 @@ def generate_data(model_path, mode, split, domain, beam_width, sample_num, outpu
     df["messages"] = df["messages"].apply(lambda x: x[:-1] + [{"role": "assistant", "content": prompt_prefix}])
     if mode == "title":
         # outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=beam_width, max_tokens=32)
-        outputs = batch_chat(llm, df["messages"].tolist())
+        outputs = batch_chat(llm, df["messages"].tolist(), beam_width=beam_width)
     else:
         outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=beam_width, max_tokens=4)
     log_with_color(logger, "INFO", f"Batch chatting done", "magenta")

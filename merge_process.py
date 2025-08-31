@@ -19,9 +19,9 @@ from processor.utils import save_csv_with_precision, get_merged_name
 # Fallback defaults
 MODES = ["sem_id"]
 SPLITS = ["phase2"]
-SOURCE_DOMAIN = "Video_Games"
-TARGET_DOMAINS = ["Books"]
-METHODS = ["average_merging"]
+SOURCE_DOMAIN = "Books"
+TARGET_DOMAINS = ["Video_Games"]
+METHODS = ["ties_merging"]
 
 # Default Settings
 HLLM_CLASS_PATH = "/data/tjwei/HLLM/code"
@@ -228,7 +228,7 @@ def merge_and_eval(args, eval_groups, top_k=[5,10,20]):
 
     for source, eval_names in eval_groups.items():
         if args.mode == "title":
-            metrics = title_eval(source, None, embed_model, top_k=top_k, beam_size=3, rescale=True, eval_names=eval_names)
+            metrics = title_eval(source, None, embed_model, top_k=top_k, beam_size=args.beam_width, rescale=False, eval_names=eval_names)
         elif args.mode == "sem_id":
             # embed_model_path = f"data/tokens/amazon_{source}_model.pth"
             # embed_model = torch.load(embed_model_path)
@@ -246,17 +246,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
     all_eval_names = []
 
-    args.gpu_id = "2"
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+    args.gpu_id = "0"
+    # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
-    args.skip_merging = True
-    args.skip_generation = True
-    args.skip_cleanup = True
+    # args.skip_merging = True
+    # args.skip_generation = True
+    # args.skip_cleanup = True
 
     if not args.beam_width:
         args.beam_width = BEAM_WIDTHS.get(args.mode, 5)
 
     from test.test_loop import get_eval_groups
-    eval_groups = get_eval_groups("add_one_merging")(args, ModelMerger)
+    eval_groups = get_eval_groups("complete_merging")(args, ModelMerger)
 
     merge_and_eval(args, eval_groups)

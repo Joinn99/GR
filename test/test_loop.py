@@ -1,6 +1,6 @@
 import torch
 
-TEST_DOMAINS = ["Video_Games", "Movies_and_TV", "Cell_Phones_and_Accessories", "Sports_and_Outdoors", "Books"]
+TEST_DOMAINS = ["Video_Games", "Movies_and_TV", "Cell_Phones_and_Accessories", "Sports_and_Outdoors", "Books", "Office_Products", "Health_and_Household", "Software"]
 
 def single_run(args, model_merger_class):
     merger = model_merger_class(args)
@@ -46,6 +46,19 @@ def single_test_merging(args, model_merger_class):
     eval_groups = {args.source_domain: [("merged", single_run(args, model_merger_class))]}
     return eval_groups
 
+def complete_merging(args, model_merger_class):
+    eval_groups = {}
+    for source_domain in TEST_DOMAINS:
+        args.source_domain = source_domain
+        eval_groups[source_domain] = []
+        for target_domains in [[domain] for domain in TEST_DOMAINS if domain != source_domain]:
+            args.target_domains = target_domains
+            args.method = "mask_merging" if args.mode == "title" else "ties_merging"
+            try:
+                eval_groups[source_domain].append(("merged", single_run(args, model_merger_class)))
+            except Exception as e:
+                print(f"Error during merging: {e}")
+    return eval_groups
 
 def get_eval_groups(name = "all_merging"):
     if name == "all_merging":
@@ -54,5 +67,7 @@ def get_eval_groups(name = "all_merging"):
         return add_one_merging
     elif name == "single_test_merging":
         return single_test_merging
+    elif name == "complete_merging":
+        return complete_merging
     else:
         raise ValueError(f"Invalid name: {name}")
