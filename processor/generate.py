@@ -1,25 +1,43 @@
+import os
 import argparse
 import pandas as pd
 import numpy as np
-
 from tqdm import tqdm
 from logger import get_logger, log_with_color
 
 tqdm.pandas()
 from vllm import LLM
 from SemLLM import SemLLM
+from logit_processor import SimpleTrieConstrainedProcessor
 # Configure logging with colors
 logger = get_logger(__name__)
 logger.propagate = False
+
+from transformers import AutoTokenizer
+
+def build_trie_processor(domain="Cell_Phones_and_Accessories", model_path="Qwen3-0.6B", start_id=151669):
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    os.environ["RQ_START_ID"] = str(start_id)
+    os.environ["RQ_CODES_PER_LAYER"] = "256"
+    os.environ["RQ_NUM_LAYERS"] = "4"
+    os.environ["RQ_ITEMS_PATH"] = f"data/tokens/amazon_{domain}_index.jsonl"
+    os.environ["RQ_EOS_ID"] = str(tokenizer.eos_token_id)  # 或者设为 -1 表示不用
+    os.environ["RQ_VOCAB_SIZE"] = str(152704)
+    return SimpleTrieConstrainedProcessor
 
 def get_llm(
     model_path,
     beam_width=None,
     mode="title",
+    domain="Cell_Phones_and_Accessories",
 ):
-    from vllm import LLM
-    from SemLLM import SemLLM
-    llm_class = SemLLM if mode == "sem_id" else LLM
+    if mode == "sem_id":
+        llm_class = LLM
+        assert os.path.exists(f"data/tokens/amazon_{domain}_index.jsonl"), f"Index file for {domain} not found"
+        logits_processors = [build_trie_processor(domain, model_path)]
+    else:
+        llm_class = LLM
+        logits_processors = None
     max_logprobs = 2 * beam_width if beam_width else 20
     llm = llm_class(
         model=model_path,
@@ -30,6 +48,7 @@ def get_llm(
         enforce_eager=True,
         max_logprobs=max_logprobs,
         logprobs_mode="processed_logprobs" if mode == "sem_id" else "raw_logprobs",
+        logits_processors=logits_processors,
     )
     return llm
 
@@ -37,12 +56,13 @@ def batch_chat(
     llm,
     messages,
     beam_width=20,
+    max_tokens=32,
 ):
     from vllm import SamplingParams
     sampling_params=SamplingParams(
         n=beam_width,
         temperature=0.6,
-        max_tokens=32,
+        max_tokens=max_tokens,
         stop=["\n"],
     )
     output = llm.chat(
@@ -122,7 +142,7 @@ def generate_data(model_path, mode, split, domain, beam_width, sample_num, outpu
         df = df.sample(n=sample_num, random_state=0)
     df = df.sort_index()
     log_with_color(logger, "INFO", f"Loaded {len(df)} rows", "red")
-    llm = get_llm(model_path, beam_width=beam_width, mode=mode)
+    llm = get_llm(model_path, beam_width=beam_width, mode=mode, domain=domain)
     
     prompt_prefix = "Recommended Item Title:" if mode == "title" else "Recommended Item Index: "
     
@@ -130,9 +150,11 @@ def generate_data(model_path, mode, split, domain, beam_width, sample_num, outpu
     df["messages"] = df["messages"].apply(lambda x: x[:-1] + [{"role": "assistant", "content": prompt_prefix}])
     if mode == "title":
         # outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=beam_width, max_tokens=32)
-        outputs = batch_chat(llm, df["messages"].tolist(), beam_width=beam_width)
+        outputs = batch_chat(llm, df["messages"].tolist(), beam_width=beam_width, max_tokens=32)
     else:
         outputs = batch_beam_search(llm, df["messages"].tolist(), beam_width=beam_width, max_tokens=4)
+        # outputs = batch_chat(llm, df["messages"].tolist(), beam_width=beam_width, max_tokens=4)
+
     log_with_color(logger, "INFO", f"Batch chatting done", "magenta")
     
     df["output"] = outputs

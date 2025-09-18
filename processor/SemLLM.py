@@ -1,4 +1,5 @@
 import torch
+import pandas as pd
 from typing import Iterable, List
 from tqdm.auto import tqdm
 from typing import Optional, Union, cast
@@ -10,31 +11,16 @@ from vllm.beam_search import (BeamSearchInstance, BeamSearchOutput,
 from vllm.inputs import TextPrompt, TokensPrompt
 from vllm.lora.request import LoRARequest
 from vllm.sampling_params import (BeamSearchParams, SamplingParams)
- 
+from vllm.v1.sample.logits_processor.interface import LogitsProcessor, BatchUpdate
+from vllm.config import VllmConfig
+from typing import List, Tuple, Set, Optional
 
-class RangeLogitsProcessor:
-    """Logits processor for constraining generated tokens to a
-    specific set of token ids."""
+import torch
+import pandas as pd
+from typing import Optional
+from vllm.v1.sample.logits_processor.interface import LogitsProcessor, BatchUpdate
+from vllm.config import VllmConfig
 
-    def __init__(self, start_id: int, end_id: int):
-        self.start_id = start_id
-        self.end_id = end_id
-
-
-    def __call__(self, token_ids: list[int],
-                 logits: torch.Tensor) -> torch.Tensor:
-        mask = torch.ones((logits.shape[-1], ),
-                                   dtype=torch.bool,
-                                   device=logits.device)
-        mask[self.start_id:self.end_id] = False
-        logits.masked_fill_(mask, float("-inf"))
-        return logits
-
-def make_id_range_processor(
-    start: int,
-    end: int
-):
-    return RangeLogitsProcessor(start, end)
 
 class SemLLM(LLM):
     def beam_search(
@@ -139,14 +125,6 @@ class SemLLM(LLM):
                 *[(create_tokens_prompt_from_beam(beam), beam.lora_request)
                     for beam in all_beams])
 
-            # only runs for one step
-
-            ###################### MODIFIED CODE ######################
-            start_id = 151669
-            beam_search_params.allowed_token_ids = [start_id + 256 * idx + j for j in range(256)]
-            ############################################################
-            
-            # we don't need to use tqdm here
             output = self.generate(prompts_batch,
                                     sampling_params=beam_search_params,
                                     use_tqdm=False,
