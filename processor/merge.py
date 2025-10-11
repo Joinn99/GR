@@ -25,14 +25,17 @@ def hllm_from_pretrained(checkpoint_path: str = None, class_path: str = None, ba
 
     with open(f"config/hllm.json", "r") as f:
         config = json.load(f)
-    if base_model_path:
+    if base_model_path and ("pretrain" not in base_model_path):
         config["item_pretrain_dir"] = base_model_path
         config["user_pretrain_dir"] = base_model_path
         config["item_llm_init"] = True
         config["user_llm_init"] = True
         config["load_pretrain"] = None
     else:
-        config["load_pretrain"] = checkpoint_path + "/model.safetensors"
+        if base_model_path:
+            config["load_pretrain"] = base_model_path + "/model.safetensors"
+        else:
+            config["load_pretrain"] = checkpoint_path + "/model.safetensors"
     model = HLLM(config, None)
     return model.to(torch.bfloat16).to("cuda")
 
@@ -148,7 +151,7 @@ def merge_models(mode, source_domain, target_domains, splits, method, base_model
         merged_model_path = get_model_path(mode, splits[0], source_domain)
         models_to_merge_paths = [
             get_model_path(mode, split, source_domain)
-            for split in splits
+            for split in splits[1:]
         ]
 
     # Load models

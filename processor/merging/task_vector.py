@@ -47,6 +47,25 @@ class TaskVector:
         """
         return self.__add__(other)
 
+    def __mul__(self, other):
+        """
+        multiply task vector
+        :param other: TaskVector to multiply, at right side
+        :return:
+        """
+        if isinstance(other, TaskVector):
+            new_task_vector_param_dict = {}
+            with torch.no_grad():
+                for param_name in self.task_vector_param_dict:
+                    assert param_name in other.task_vector_param_dict.keys(), f"param_name {param_name} is not contained in both task vectors!"
+                    new_task_vector_param_dict[param_name] = self.task_vector_param_dict[param_name] * other.task_vector_param_dict[param_name]
+        else:
+            assert isinstance(other, float), "multiplication of TaskVector can only be done with another TaskVector or a float!"
+            with torch.no_grad():
+                new_task_vector_param_dict = {param_name: self.task_vector_param_dict[param_name] * other for param_name in self.task_vector_param_dict}
+            
+        return TaskVector(task_vector_param_dict=new_task_vector_param_dict)
+
     def combine_with_pretrained_model(self, pretrained_model: nn.Module, scaling_coefficient: float = 1.0):
         """
         combine the task vector with pretrained model
@@ -54,7 +73,10 @@ class TaskVector:
         :param scaling_coefficient: float, scaling coefficient to merge the task vector
         :return:
         """
-        pretrained_param_dict = {param_name: param_value for param_name, param_value in pretrained_model.named_parameters()}
+        if isinstance(pretrained_model, dict):
+            pretrained_param_dict = pretrained_model
+        else:
+            pretrained_param_dict = {param_name: param_value for param_name, param_value in pretrained_model.named_parameters()}
 
         with torch.no_grad():
             merged_params = {}

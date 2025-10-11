@@ -9,6 +9,9 @@ def get_param_names_to_merge(input_param_names: list, exclude_param_names_regex:
     """
     param_names_to_merge = []
     for param_name in input_param_names:
+        if exclude_param_names_regex is None:
+            param_names_to_merge.append(param_name)
+            continue
         exclude = any([re.match(exclude_pattern, param_name) for exclude_pattern in exclude_param_names_regex])
         if not exclude:
             param_names_to_merge.append(param_name)

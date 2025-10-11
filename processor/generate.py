@@ -7,7 +7,6 @@ from logger import get_logger, log_with_color
 
 tqdm.pandas()
 from vllm import LLM
-from SemLLM import SemLLM
 from logit_processor import SimpleTrieConstrainedProcessor
 # Configure logging with colors
 logger = get_logger(__name__)
