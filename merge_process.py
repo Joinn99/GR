@@ -9,6 +9,7 @@ import shutil
 import sys
 import torch
 import pandas as pd
+import json
 from typing import Optional
 
 sys.path.append("./processor")
@@ -17,11 +18,11 @@ from processor.generate import generate_data
 from processor.utils import save_csv_with_precision, get_merged_name
 
 # Fallback defaults
-MODES = ["sem_id"]
-SPLITS = ["phase2"]
-SOURCE_DOMAIN = "Books"
-TARGET_DOMAINS = ["Video_Games"]
-METHODS = ["ties_merging"]
+MODES = ["hllm"]
+SPLITS = ["phase1", "phase2"]
+SOURCE_DOMAIN = "Video_Games"
+TARGET_DOMAINS = []
+METHODS = ["task_arithmetic"]
 
 # Default Settings
 HLLM_CLASS_PATH = "/data/tjwei/HLLM/code"
@@ -46,6 +47,8 @@ def setup_argparse():
     parser.add_argument("--method", type=str, default=METHODS[0] if METHODS else "task_arithmetic",
                        choices=["average_merging", "ties_merging", "mask_merging", "task_arithmetic"],
                        help="Merging method")
+    parser.add_argument("--merging_args", type=str, default="{}",
+                       help="Merging arguments")
     
     # Model paths
     parser.add_argument("--base_model_path", type=str, 
@@ -87,6 +90,7 @@ class ModelMerger:
         self.sample_num = args.sample_num
         self.base_model_path = args.base_model_path
         self.hllm_class_path = args.hllm_class_path
+        self.merging_args = json.loads(args.merging_args) if args.merging_args and isinstance(args.merging_args, str) else args.merging_args
         
         self.gpu_id = args.gpu_id
         if args.beam_width is None:
@@ -109,7 +113,8 @@ class ModelMerger:
                 splits=self.splits,
                 method=self.method,
                 base_model_path=args.base_model_path,
-                hllm_class_path=args.hllm_class_path
+                hllm_class_path=args.hllm_class_path,
+                merging_args=self.merging_args
             )
         else:
             return get_merged_name(
@@ -117,7 +122,8 @@ class ModelMerger:
                 self.source_domain,
                 self.target_domains,
                 self.splits,
-                self.method
+                self.method,
+                self.merging_args
             )
     
     def run_generation(self, model_name: str):
@@ -246,7 +252,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     all_eval_names = []
 
-    args.gpu_id = "0"
+    args.base_model_path = f"{os.getenv('data', '')}/Common/GenRec/{args.source_domain}-pretrain"
     # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
     # args.skip_merging = True
@@ -257,6 +263,6 @@ if __name__ == "__main__":
         args.beam_width = BEAM_WIDTHS.get(args.mode, 5)
 
     from test.test_loop import get_eval_groups
-    eval_groups = get_eval_groups("complete_merging")(args, ModelMerger)
+    eval_groups = get_eval_groups("temporal_task_arithmetic_merging")(args, ModelMerger)
 
     merge_and_eval(args, eval_groups)

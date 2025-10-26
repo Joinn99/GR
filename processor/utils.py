@@ -66,15 +66,20 @@ def format_float_columns(df, precision=6):
     
     return df_formatted
 
-def get_merged_name(mode: str, source_domain: str, target_domains: List[str], splits: List[str], method: str):
+def get_merged_name(mode: str, source_domain: str, target_domains: List[str], splits: List[str], method: str, merging_args: dict = None):
     assert min(len(splits), len(target_domains)) <= 1, "Split and target domains cannot be > 1 at the same time"
     source_domain = source_domain[:3]
     target_domains = [domain[:3] for domain in target_domains]
 
+
     if len(splits) == 1:
-        return f"merged-{source_domain}-{''.join(target_domains)}-{splits[0]}-{mode}-{method[:4]}"
+        name = f"merged-{source_domain}-{''.join(target_domains)}-{splits[0]}-{mode}-{method[:4]}"
     else:
-        return f"merged-{source_domain}-{''.join(splits)}-{mode}-{method[:4]}"
+        name = f"merged-{source_domain}-{''.join(splits)}-{mode}-{method[:4]}"
+
+    if merging_args is not None:
+        name += f"-{'-'.join([f'{k[:3]}={v}' for k, v in merging_args.items()])}"
+    return name
 
 
 def init_seed(seed, reproducibility):

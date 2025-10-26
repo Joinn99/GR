@@ -117,7 +117,7 @@ def save_merged_model(merged_model, merged_model_path: str, output_path: str, mo
     log_with_color(logger, "INFO", f"Merged model name: <<<{name}>>>", "green")
     log_with_color(logger, "INFO", f"Successfully saved merged model to: {output_path}", "green")
 
-def merge_models(mode, source_domain, target_domains, splits, method, base_model_path=None, hllm_class_path=None):
+def merge_models(mode, source_domain, target_domains, splits, method, base_model_path=None, hllm_class_path=None, merging_args=None):
     """
     Main function to perform model merging process
     
@@ -138,7 +138,7 @@ def merge_models(mode, source_domain, target_domains, splits, method, base_model
     init_seed(0, reproducibility=True)
     
     # Get model paths
-    output_name = get_merged_name(mode, source_domain, target_domains, splits, method)
+    output_name = get_merged_name(mode, source_domain, target_domains, splits, method, merging_args)
     output_path = f"{os.environ['data']}/Common/GenRec/{output_name}"
 
     if len(splits) == 1:
@@ -167,7 +167,8 @@ def merge_models(mode, source_domain, target_domains, splits, method, base_model
     merged_model = MergingMethod(method).get_merged_model(
         merged_model=merged_model,
         models_to_merge=models_to_merge,
-        exclude_param_names_regex=[]
+        exclude_param_names_regex=[],
+        **merging_args
     )
     
     if mode == "sem_id":

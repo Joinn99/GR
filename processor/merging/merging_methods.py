@@ -85,11 +85,13 @@ class AverageMerging(ModelMergingMethod):
         return averaged_params
 
 
+from .fuser import TemporalModelFuser
+
 class TaskArithmeticMerging(ModelMergingMethod):
     """Task arithmetic merging method - using task vectors with scaling coefficient."""
-    
+
     def merge(self, merged_model: nn.Module, models_to_merge: list, exclude_param_names_regex: list, 
-              scaling_coefficient: float = 1.0, **kwargs):
+              scaling_coefficient: float = 0.05, **kwargs):
         """
         Task arithmetic method
         :param merged_model: nn.Module, the merged model
@@ -100,22 +102,73 @@ class TaskArithmeticMerging(ModelMergingMethod):
         """
         assert isinstance(scaling_coefficient, float), "wrong type of scaling_coefficient, should be float!"
 
-        models_to_merge_task_vectors = [TaskVector(pretrained_model=merged_model, finetuned_model=model_to_merge, 
-                                                  exclude_param_names_regex=exclude_param_names_regex) 
-                                       for model_to_merge in models_to_merge]
+        fuser = TemporalModelFuser(base_model=merged_model)
 
-        # iterate each individual model that needs to be merged
         with torch.no_grad():
-            # sum up the task vectors
-            merged_task_vector = models_to_merge_task_vectors[0] + models_to_merge_task_vectors[1]
-            for index in range(2, len(models_to_merge_task_vectors)):
-                merged_task_vector = merged_task_vector + models_to_merge_task_vectors[index]
-
-            # combine with parameters of the merged model based on scaling coefficient
-            merged_params = merged_task_vector.combine_with_pretrained_model(pretrained_model=merged_model, 
-                                                                           scaling_coefficient=scaling_coefficient)
-
+            # merged_params = fuser.extrapolate_moving_average_velocity(
+            #     checkpoints=[merged_model] + models_to_merge[::-1], scaling_coefficient=0.1
+            # )
+            # merged_params = fuser.extrapolate_with_acceleration(
+            #     checkpoints=[merged_model] + models_to_merge[::-1], velocity_scale=0.15, acceleration_scale=0.15
+            # )
+            # merged_params = fuser.fuse_exponential_decay(
+            #     checkpoints=[merged_model] + models_to_merge[::-1], decay_rate=0.5
+            # )
+            merged_params = fuser.extrapolate_linear_velocity(
+                checkpoints=[merged_model] + models_to_merge[::-1], scaling_coefficient=scaling_coefficient
+            )
         return merged_params
+
+
+    # def merge(self, merged_model: nn.Module, models_to_merge: list, exclude_param_names_regex: list, 
+    #           scaling_coefficient: float = 0.05, **kwargs):
+    #     """
+    #     Task arithmetic method
+    #     :param merged_model: nn.Module, the merged model
+    #     :param models_to_merge: list, individual models that need to be merged
+    #     :param exclude_param_names_regex: list, regular expression of names of parameters that need to be excluded
+    #     :param scaling_coefficient: float, scaling coefficient to merge the task vectors
+    #     :return: dict, merged parameters
+    #     """
+    #     assert isinstance(scaling_coefficient, float), "wrong type of scaling_coefficient, should be float!"
+
+    #     phase_2_model, phase_1_model = models_to_merge[0], models_to_merge[1]
+    #     diff_task_vector = TaskVector(pretrained_model=phase_1_model, finetuned_model=phase_2_model, 
+    #                                  exclude_param_names_regex=exclude_param_names_regex)
+    #     with torch.no_grad():
+    #         merged_params = diff_task_vector.combine_with_pretrained_model(pretrained_model=phase_2_model, 
+    #                                                                        scaling_coefficient=scaling_coefficient)
+    #     return merged_params
+        
+
+    # def merge(self, merged_model: nn.Module, models_to_merge: list, exclude_param_names_regex: list, 
+    #           scaling_coefficient: float = 1.0, **kwargs):
+    #     """
+    #     Task arithmetic method
+    #     :param merged_model: nn.Module, the merged model
+    #     :param models_to_merge: list, individual models that need to be merged
+    #     :param exclude_param_names_regex: list, regular expression of names of parameters that need to be excluded
+    #     :param scaling_coefficient: float, scaling coefficient to merge the task vectors
+    #     :return: dict, merged parameters
+    #     """
+    #     assert isinstance(scaling_coefficient, float), "wrong type of scaling_coefficient, should be float!"
+
+    #     models_to_merge_task_vectors = [TaskVector(pretrained_model=merged_model, finetuned_model=model_to_merge, 
+    #                                               exclude_param_names_regex=exclude_param_names_regex) 
+    #                                    for model_to_merge in models_to_merge]
+
+    #     # iterate each individual model that needs to be merged
+    #     with torch.no_grad():
+    #         # sum up the task vectors
+    #         merged_task_vector = models_to_merge_task_vectors[0] + models_to_merge_task_vectors[1]
+    #         for index in range(2, len(models_to_merge_task_vectors)):
+    #             merged_task_vector = merged_task_vector + models_to_merge_task_vectors[index]
+
+    #         # combine with parameters of the merged model based on scaling coefficient
+    #         merged_params = merged_task_vector.combine_with_pretrained_model(pretrained_model=merged_model, 
+    #                                                                        scaling_coefficient=scaling_coefficient)
+
+    #     return merged_params
 
 
 class TiesMerging(ModelMergingMethod):
@@ -248,7 +301,7 @@ class MaskMerging(ModelMergingMethod):
     def merge(self, merged_model: nn.Module, models_to_merge: list, exclude_param_names_regex: list, 
               weight_format: str = "delta_weight", weight_mask_rates: list = None, 
               use_weight_rescale: bool = True, mask_strategy: str = "random", 
-              mask_apply_method: str = "average_merging", models_use_deepcopy: bool = False, **kwargs):
+              mask_apply_method: str = "task_arithmetic", models_use_deepcopy: bool = False, **kwargs):
         """
         Mask merging method
         :param merged_model: nn.Module, the merged model

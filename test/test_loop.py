@@ -42,6 +42,15 @@ def add_one_merging(args, model_merger_class):
                     continue
     return eval_groups
 
+def temporal_task_arithmetic_merging(args, model_merger_class):
+    eval_groups = {args.source_domain: []}
+    import numpy as np
+    scaling_coefficient_list = np.arange(-0.5, 0.5, 0.005)
+    for scaling_coefficient in scaling_coefficient_list:
+        args.merging_args = {"scaling_coefficient": scaling_coefficient}
+        eval_groups[args.source_domain].append(("merged", single_run(args, model_merger_class)))
+    return eval_groups
+
 def single_test_merging(args, model_merger_class):
     eval_groups = {args.source_domain: [("merged", single_run(args, model_merger_class))]}
     return eval_groups
@@ -69,5 +78,7 @@ def get_eval_groups(name = "all_merging"):
         return single_test_merging
     elif name == "complete_merging":
         return complete_merging
+    elif name == "temporal_task_arithmetic_merging":
+        return temporal_task_arithmetic_merging
     else:
         raise ValueError(f"Invalid name: {name}")
