@@ -300,16 +300,31 @@ if __name__ == "__main__":
     parser = setup_argparse()
     args = parser.parse_args()
 
-    args.modes = ["sem_id"]
+    args.modes = ["title"]
     args.source_domain = "Video_Games"
     args.splits = ["phase2"]
 
+
+    splits = ["pretrain", "phase1", "phase2"]
     domains = ["Video_Games", "Movies_and_TV", "Sports_and_Outdoors", "Books", "Cell_Phones_and_Accessories"]
-    for i in range(len(domains)):
-        for j in range(i+1, len(domains)):
-            args.target_domains = [domains[i], domains[j]]
-            args.splits = ["phase2"]
-            args.hllm_class_path = "/data/tjwei/HLLM/code"
-            # Ensure deterministic default dtype for any CPU ops
-            torch.set_grad_enabled(False)
-            StatsComputer(args).run()
+
+
+    # for i in range(len(domains)):
+    #     for j in range(i+1, len(domains)):
+    #         args.target_domains = [domains[i], domains[j]]
+    #         args.splits = ["phase2"]
+    #         args.hllm_class_path = "/data/tjwei/HLLM/code"
+    #         # Ensure deterministic default dtype for any CPU ops
+    #         torch.set_grad_enabled(False)
+    #         StatsComputer(args).run()
+
+
+    for domain in domains:
+        for split in range(len(splits)):
+            for split2 in range(split+1, len(splits)):
+                args.target_domains = [domain]
+                args.splits = [splits[split], splits[split2]]
+                args.hllm_class_path = "/data/tjwei/HLLM/code"
+                # Ensure deterministic default dtype for any CPU ops
+                torch.set_grad_enabled(False)
+                StatsComputer(args).run()

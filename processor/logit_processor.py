@@ -71,8 +71,8 @@ class SimpleTrieConstrainedProcessor(LogitsProcessor):
       RQ_CODES_PER_LAYER=256, RQ_NUM_LAYERS=4, RQ_EOS_ID=-1(禁用)
     """
     def __init__(self, vllm_config: VllmConfig, device: torch.device, is_pin_memory: bool):
-        start_id = int(os.getenv("RQ_START_ID"), "151669")
-        vocab_size = int(os.getenv("RQ_VOCAB_SIZE"), "152704")
+        start_id = int(os.getenv("RQ_START_ID", "151669"))  
+        vocab_size = int(os.getenv("RQ_VOCAB_SIZE", "152704"))
         L = int(os.getenv("RQ_CODES_PER_LAYER", "256"))
         K = int(os.getenv("RQ_NUM_LAYERS", "4"))
         eos_id_env = int(os.getenv("RQ_EOS_ID", "-1"))

@@ -234,7 +234,7 @@ def sem_id_eval(domain, splits, top_k=[10, 20, 50], eval_names=None):
     return all_metrics
 
 def id_match(results, target):
-    t = target.split("<d_")[0]
+    t = target#.split("<d_")[0]
     output = [t in e for e in results]
     return output
     
