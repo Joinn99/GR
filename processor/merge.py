@@ -25,7 +25,7 @@ def hllm_from_pretrained(checkpoint_path: str = None, class_path: str = None, ba
 
     with open(f"config/hllm.json", "r") as f:
         config = json.load(f)
-    if base_model_path and ("pretrain" not in base_model_path):
+    if base_model_path and ("pretrain" not in base_model_path) and ("phase1" not in base_model_path) and ("merged" not in base_model_path) and ("phase2" not in base_model_path):
         config["item_pretrain_dir"] = base_model_path
         config["user_pretrain_dir"] = base_model_path
         config["item_llm_init"] = True
